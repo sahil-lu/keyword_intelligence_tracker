@@ -1,7 +1,22 @@
 {
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  }
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			"@/ui/*": [
+				"./src/components/ui/*"
+			],
+			"@/atoms/*": [
+				"./src/components/atoms/*"
+			],
+			"@/molecules/*": [
+				"./src/components/molecules/*"
+			],
+			"@/organisms/*": [
+				"./src/components/organisms/*"
+			],
+			"@/*": [
+				"./src/*"
+			]
+		}
+	}
 }

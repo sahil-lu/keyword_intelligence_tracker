@@ -1,7 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
-  reactCompiler: true,
-};
+	experimental: {
+		viewTransition: true,
+	},
+	images: {
+		remotePatterns: [
+			{
+				protocol: "https",
+				hostname: "frontend-assets.supabase.com",
+			},
+		],
+	},
+}
 
-export default nextConfig;
+export default nextConfig
