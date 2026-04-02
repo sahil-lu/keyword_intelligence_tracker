@@ -70,10 +70,10 @@ class CookieManager {
 		this.wildCardConfig =
 			typeof useWildCard === "boolean"
 				? {
-					basicAccess: useWildCard,
-					access: useWildCard,
-					refresh: useWildCard,
-				}
+						basicAccess: useWildCard,
+						access: useWildCard,
+						refresh: useWildCard,
+					}
 				: { ...DEFAULT_WILDCARD_CONFIG, ...useWildCard }
 
 		this.cookieKeys = {
@@ -271,11 +271,7 @@ class CookieManager {
 	 */
 	removeTokens() {
 		Object.keys(this.cookieKeys).forEach(key =>
-			this.updateToken(
-				key,
-				null,
-				this.cookieKeys[key]
-			)
+			this.updateToken(key, null, this.cookieKeys[key])
 		)
 	}
 

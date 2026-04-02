@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import {
 	getProfile,
@@ -6,15 +6,15 @@ import {
 	sendOTP,
 	setProfile,
 	verifyOTP,
-} from "@/actions/auth";
-import useMediaQuery from "@/hooks/useMediaQuery";
-import { getType } from "@/lib/utils";
-import Autocomplete from "@/molecules/autocomplete";
-import cookieService from "@/services/cookie";
-import useStore from "@/store";
-import { Button } from "@/ui/button";
-import { Dialog, DialogContent } from "@/ui/dialog";
-import { Drawer, DrawerContent } from "@/ui/drawer";
+} from "@/actions/auth"
+import useMediaQuery from "@/hooks/useMediaQuery"
+import { getType } from "@/lib/utils"
+import Autocomplete from "@/molecules/autocomplete"
+import cookieService from "@/services/cookie"
+import useStore from "@/store"
+import { Button } from "@/ui/button"
+import { Dialog, DialogContent } from "@/ui/dialog"
+import { Drawer, DrawerContent } from "@/ui/drawer"
 import {
 	Form,
 	FormControl,
@@ -22,23 +22,23 @@ import {
 	FormItem,
 	FormLabel,
 	FormMessage,
-} from "@/ui/form";
-import { Input } from "@/ui/input";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/ui/input-otp";
-import { Label } from "@/ui/label";
-import { zodResolver } from "@hookform/resolvers/zod";
+} from "@/ui/form"
+import { Input } from "@/ui/input"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/ui/input-otp"
+import { Label } from "@/ui/label"
+import { zodResolver } from "@hookform/resolvers/zod"
 // import * as Sentry from "@sentry/nextjs"
-import IPData from "ipdata";
-import { PencilIcon } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { z } from "zod";
+import IPData from "ipdata"
+import { PencilIcon } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
 
-const AUTO_AUTH_TIMER = 5; // in seconds
+const AUTO_AUTH_TIMER = 5 // in seconds
 
 const AuthProvider = ({
 	children,
@@ -49,19 +49,19 @@ const AuthProvider = ({
 	},
 	withForm = true,
 }) => {
-	const isAuthenticated = useStore((store) => store.isAuthenticated);
-	const launchCode = useStore((store) => store.queryParams.launchCode);
-	const dispatch = useStore((store) => store.dispatch);
+	const isAuthenticated = useStore(store => store.isAuthenticated)
+	const launchCode = useStore(store => store.queryParams.launchCode)
+	const dispatch = useStore(store => store.dispatch)
 
 	useEffect(() => {
-		if (isAuthenticated) return;
-		const token = cookieService.getToken("access") || launchCode;
+		if (isAuthenticated) return
+		const token = cookieService.getToken("access") || launchCode
 
 		if (token)
 			getProfile(token).then(({ error, message, data: user }) => {
 				if (error) {
-					toast.error(message);
-					return;
+					toast.error(message)
+					return
 				}
 				dispatch({
 					type: "SET_STATE",
@@ -72,16 +72,16 @@ const AuthProvider = ({
 						isAuthenticated: true,
 						closableAuth: true,
 					},
-				});
-			});
+				})
+			})
 		else if (children)
 			dispatch({
 				type: "SET_STATE",
 				payload: { openAuth: true, closableAuth: !children },
-			});
+			})
 
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [launchCode]);
+	}, [launchCode])
 
 	return (
 		<>
@@ -90,17 +90,17 @@ const AuthProvider = ({
 			{withPrompt && <AuthPrompter {...prompt} />}
 			{withForm && <AuthForm />}
 		</>
-	);
-};
+	)
+}
 
-export default AuthProvider;
+export default AuthProvider
 
 export const useAuthPrompter = ({
 	closable = true,
 	time = AUTO_AUTH_TIMER,
 }) => {
-	const isAuthenticated = useStore((store) => store.isAuthenticated);
-	const dispatch = useStore((store) => store.dispatch);
+	const isAuthenticated = useStore(store => store.isAuthenticated)
+	const dispatch = useStore(store => store.dispatch)
 
 	useEffect(() => {
 		if (!isAuthenticated) {
@@ -108,83 +108,83 @@ export const useAuthPrompter = ({
 				dispatch({
 					type: "SET_STATE",
 					payload: { openAuth: true, closableAuth: closable },
-				});
-			}, 1000 * time);
+				})
+			}, 1000 * time)
 
-			return () => clearTimeout(timer);
+			return () => clearTimeout(timer)
 		}
-	}, [closable, dispatch, isAuthenticated, time]);
+	}, [closable, dispatch, isAuthenticated, time])
 
-	return null;
-};
+	return null
+}
 
-export const AuthPrompter = useAuthPrompter;
+export const AuthPrompter = useAuthPrompter
 
 export const useAuthenticator = () => {
-	const router = useRouter();
+	const router = useRouter()
 
-	const isAuthenticated = useStore((store) => store.isAuthenticated);
-	const dispatch = useStore((store) => store.dispatch);
+	const isAuthenticated = useStore(store => store.isAuthenticated)
+	const dispatch = useStore(store => store.dispatch)
 
-	const [callback, setCallback] = useState(null);
+	const [callback, setCallback] = useState(null)
 
 	const authenticate =
 		({ cb, route }) =>
-		(e) => {
-			e?.preventDefault();
+		e => {
+			e?.preventDefault()
 
 			if (route && !getType(cb).includes("Function"))
-				cb = () => router.push(route);
+				cb = () => router.push(route)
 
 			if (!isAuthenticated) {
-				setCallback(() => cb);
+				setCallback(() => cb)
 				dispatch({
 					type: "SET_STATE",
 					payload: { openAuth: true, closableAuth: !cb },
-				});
+				})
 			} else {
-				cb?.();
+				cb?.()
 			}
-		};
+		}
 
 	useEffect(() => {
 		if (isAuthenticated && callback) {
-			callback();
-			setCallback(null);
+			callback()
+			setCallback(null)
 		}
-	}, [isAuthenticated, callback]);
+	}, [isAuthenticated, callback])
 
-	return { authenticate };
-};
+	return { authenticate }
+}
 
-export const withAuth = (WrappedComponent) => {
-	const WithAuth = (props) => {
-		const isAuthenticated = useStore((store) => store.isAuthenticated);
-		const dispatch = useStore((store) => store.dispatch);
+export const withAuth = WrappedComponent => {
+	const WithAuth = props => {
+		const isAuthenticated = useStore(store => store.isAuthenticated)
+		const dispatch = useStore(store => store.dispatch)
 
 		useEffect(() => {
 			if (!isAuthenticated) {
 				dispatch({
 					type: "SET_STATE",
 					payload: { openAuth: true, closableAuth: false },
-				});
+				})
 			}
-		}, [isAuthenticated, dispatch]);
+		}, [isAuthenticated, dispatch])
 
 		// If not authenticated, return null or you can return a loading state or redirect to login
-		if (!isAuthenticated) return null;
+		if (!isAuthenticated) return null
 
 		// Return the wrapped component with the passed props
-		return <WrappedComponent {...props} />;
-	};
+		return <WrappedComponent {...props} />
+	}
 
 	// Set display name for debugging purposes
 	WithAuth.displayName = `WithAuth(${
 		WrappedComponent.displayName || WrappedComponent.name || "Component"
-	})`;
+	})`
 
-	return WithAuth;
-};
+	return WithAuth
+}
 
 export const AuthElement = ({
 	as: Element = "button",
@@ -193,13 +193,13 @@ export const AuthElement = ({
 	children,
 	...props
 }) => {
-	const { authenticate } = useAuthenticator();
+	const { authenticate } = useAuthenticator()
 
 	// Handle case where 'Link' is passed as the element type
 	if (["a", "Link"].includes(Element)) {
 		console.warn(
 			"WARNING: Link is not supported in AuthElement and will be ignored"
-		);
+		)
 		return (
 			<Element
 				{...{
@@ -210,62 +210,66 @@ export const AuthElement = ({
 			>
 				{children}
 			</Element>
-		);
+		)
 	}
 
 	// If the element is a 'Button', use the Button component
-	if (Element === "Button") Element = Button;
+	if (Element === "Button") Element = Button
 
-	const handleClick = (e) => {
-		e.preventDefault();
+	const handleClick = e => {
+		e.preventDefault()
 
 		if (href) {
-			authenticate({ route: href })(e);
+			authenticate({ route: href })(e)
 		} else {
 			authenticate(
 				typeof onClick === "function" ? { cb: () => onClick(e) } : {}
-			)(e);
+			)(e)
 		}
-	};
+	}
 
 	return (
-		<Element onClick={handleClick} href={href} {...props}>
+		<Element
+			onClick={handleClick}
+			href={href}
+			{...props}
+		>
 			{children}
 		</Element>
-	);
-};
+	)
+}
 
 const AuthForm = () => {
-	const authId = useStore((store) => store.authId);
-	const openAuth = useStore((store) => store.openAuth);
-	const closableAuth = useStore((store) => store.closableAuth);
-	const queryParams = useStore((store) => store.queryParams);
-	const dispatch = useStore((store) => store.dispatch);
+	const authId = useStore(store => store.authId)
+	const openAuth = useStore(store => store.openAuth)
+	const closableAuth = useStore(store => store.closableAuth)
+	const queryParams = useStore(store => store.queryParams)
+	const dispatch = useStore(store => store.dispatch)
 
-	const [loading, setLoading] = useState(false);
+	const [loading, setLoading] = useState(false)
 	const [phoneNumber, setPhoneNumber] = useState({
 		phoneNumber: "",
-	});
-	const [type, setType] = useState(0);
+	})
+	const [type, setType] = useState(0)
 
-	const editNumber = () => setType(0);
+	const editNumber = () => setType(0)
 
-	const isMD = useMediaQuery("(min-width: 768px)");
+	const isMD = useMediaQuery("(min-width: 768px)")
 
 	const closeAuth = () =>
 		type === 0 && closableAuth
 			? dispatch({
 					type: "SET_STATE",
 					payload: { openAuth: false },
-			  })
-			: undefined;
+				})
+			: undefined
 
-	const handlePostVerification = async (token) => {
-		const { error, message, data: user } = await getProfile(token);
+	const handlePostVerification = async token => {
+		const { error, message, data: user } = await getProfile(token)
 
 		if (error) {
-			toast.error(message);
-			return;
+			toast.error(message)
+			return
 		}
 
 		// const userMetaData = user
@@ -280,104 +284,107 @@ const AuthForm = () => {
 				isAuthenticated: true,
 				closableAuth: true,
 			},
-		});
+		})
 		setTimeout(() => {
-			setType(0);
-		}, 500);
-	};
+			setType(0)
+		}, 500)
+	}
 
-	const onSubmit = (values) => {
-		setLoading(true);
+	const onSubmit = values => {
+		setLoading(true)
 
 		const handleOTP = () => {
-			setPhoneNumber(values);
+			setPhoneNumber(values)
 			sendOTP({
 				...values,
 				utm: queryParams,
 			})
 				.then(({ error, message, data }) => {
-					setLoading(false);
+					setLoading(false)
 					if (error) {
-						toast.error(message);
-						return;
+						toast.error(message)
+						return
 					}
 
-					toast.info(OTP_ATTEMPTS[0].message);
+					toast.info(OTP_ATTEMPTS[0].message)
 					dispatch({
 						type: "SET_STATE",
 						payload: { authId: data },
-					});
-					setType(1);
+					})
+					setType(1)
 				})
-				.catch((e) => {
-					console.error(e);
-					setLoading(false);
-				});
-		};
+				.catch(e => {
+					console.error(e)
+					setLoading(false)
+				})
+		}
 
 		const handleVerifyOTP = () => {
 			verifyOTP({ ...values, id: authId, ...phoneNumber })
 				.then(({ error, message, data }) => {
-					setLoading(false);
+					setLoading(false)
 					if (error) {
-						toast.error(message);
-						return;
+						toast.error(message)
+						return
 					}
 
-					const token = data.token;
+					const token = data.token
 
 					cookieService.setTokens({
 						accessToken: token,
-					});
+					})
 
-					if (data.isNew) setType(2);
-					else handlePostVerification(token);
+					if (data.isNew) setType(2)
+					else handlePostVerification(token)
 				})
-				.catch((e) => {
-					console.error(e);
-					setLoading(false);
-				});
-		};
+				.catch(e => {
+					console.error(e)
+					setLoading(false)
+				})
+		}
 
 		const handleProfileUpdate = () => {
-			const location = values.location;
-			delete values.location;
+			const location = values.location
+			delete values.location
 
-			const [city, state, country] = location.split(", ");
+			const [city, state, country] = location.split(", ")
 
 			values.location = {
 				city,
 				state,
 				country,
-			};
+			}
 
 			setProfile(values)
 				.then(({ error, message }) => {
-					setLoading(false);
+					setLoading(false)
 					if (error) {
-						toast.error(message);
-						return;
+						toast.error(message)
+						return
 					}
 
-					handlePostVerification();
+					handlePostVerification()
 				})
-				.catch((e) => {
-					console.error(e);
-					setLoading(false);
-				});
-		};
+				.catch(e => {
+					console.error(e)
+					setLoading(false)
+				})
+		}
 
-		(type === 0
+		;(type === 0
 			? handleOTP
 			: type === 1
-			? handleVerifyOTP
-			: handleProfileUpdate)();
-	};
+				? handleVerifyOTP
+				: handleProfileUpdate)()
+	}
 
-	const Form = [PhoneForm, OTPForm, RegisterForm][type];
+	const Form = [PhoneForm, OTPForm, RegisterForm][type]
 
 	return isMD ? (
-		<Dialog open={openAuth} onOpenChange={closeAuth}>
+		<Dialog
+			open={openAuth}
+			onOpenChange={closeAuth}
+		>
 			<DialogContent
 				className="px-0 py-8 sm:max-w-[425px]"
 				closable={type === 0 || closableAuth}
@@ -391,7 +398,10 @@ const AuthForm = () => {
 			</DialogContent>
 		</Dialog>
 	) : (
-		<Drawer open={openAuth} onOpenChange={closeAuth}>
+		<Drawer
+			open={openAuth}
+			onOpenChange={closeAuth}
+		>
 			<DrawerContent className="flex flex-col items-center gap-6 px-0 py-8">
 				<Form
 					onSubmit={onSubmit}
@@ -401,14 +411,14 @@ const AuthForm = () => {
 				/>
 			</DrawerContent>
 		</Drawer>
-	);
-};
+	)
+}
 
 const PhoneForm = ({ onSubmit, loading, phoneNumber }) => {
 	const form = useForm({
 		resolver: zodResolver(numberSchema),
 		defaultValues: phoneNumber,
-	});
+	})
 
 	return (
 		<Form {...form}>
@@ -419,7 +429,11 @@ const PhoneForm = ({ onSubmit, loading, phoneNumber }) => {
 				<div className="flex flex-col gap-2">
 					<div className="flex flex-col gap-4 px-8">
 						<div className="relative aspect-[2.8/1] w-32">
-							<Image src="/logo.png" alt="12th Class" fill />
+							<Image
+								src="/logo.png"
+								alt="12th Class"
+								fill
+							/>
 						</div>
 						<div className="flex flex-col">
 							<div className="text-lg font-bold text-blue-600">
@@ -444,7 +458,7 @@ const PhoneForm = ({ onSubmit, loading, phoneNumber }) => {
 											placeholder="9876543210"
 											type="number"
 											{...field}
-											className="focus-visible:outline-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+											className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-0"
 										/>
 									</FormControl>
 									<FormMessage />
@@ -471,69 +485,69 @@ const PhoneForm = ({ onSubmit, loading, phoneNumber }) => {
 				</div>
 			</form>
 		</Form>
-	);
-};
+	)
+}
 
 const OTPForm = ({ onSubmit, loading, phoneNumber, editNumber }) => {
-	const authId = useStore((store) => store.authId);
+	const authId = useStore(store => store.authId)
 
-	const [resendAttempt, setResendAttempt] = useState(1);
-	const [resendIn, setResendIn] = useState(OTP_TIMER);
+	const [resendAttempt, setResendAttempt] = useState(1)
+	const [resendIn, setResendIn] = useState(OTP_TIMER)
 	const resendIntervalRef =
-		(useRef < NodeJS.Timeout) | (undefined > undefined);
-	const resendTimerRef = (useRef < NodeJS.Timeout) | (undefined > undefined);
+		(useRef < NodeJS.Timeout) | (undefined > undefined)
+	const resendTimerRef = (useRef < NodeJS.Timeout) | (undefined > undefined)
 
 	const form = useForm({
 		resolver: zodResolver(otpSchema),
-	});
+	})
 
-	const resetResendIn = (stop) => {
-		clearInterval(resendIntervalRef.current);
-		clearTimeout(resendTimerRef.current);
-		if (!stop) setResendIn(OTP_TIMER);
-		else setResendIn(0);
-	};
+	const resetResendIn = stop => {
+		clearInterval(resendIntervalRef.current)
+		clearTimeout(resendTimerRef.current)
+		if (!stop) setResendIn(OTP_TIMER)
+		else setResendIn(0)
+	}
 
 	const handleResendIn = () => {
-		resetResendIn();
+		resetResendIn()
 		resendIntervalRef.current = setInterval(() => {
-			setResendIn((prev) => prev - 1000);
-		}, 1000);
+			setResendIn(prev => prev - 1000)
+		}, 1000)
 		resendTimerRef.current = setTimeout(() => {
-			resetResendIn(true);
-		}, OTP_TIMER);
-	};
+			resetResendIn(true)
+		}, OTP_TIMER)
+	}
 
 	const resendOTP =
 		(call = false) =>
 		() => {
 			toast.info(
 				OTP_ATTEMPTS[resendAttempt][call ? "callMessage" : "message"]
-			);
+			)
 			reSendOTP({
 				id: authId,
 				retryType: call ? "call" : "text",
 				...phoneNumber,
 			}).then(({ error, message }) => {
 				if (error) {
-					toast.error(message);
-					return;
+					toast.error(message)
+					return
 				}
 
-				setResendAttempt((prev) => prev + 1);
-				handleResendIn();
-			});
-		};
+				setResendAttempt(prev => prev + 1)
+				handleResendIn()
+			})
+		}
 
 	useEffect(() => {
-		handleResendIn();
+		handleResendIn()
 		return () => {
-			resetResendIn(true);
-			clearTimeout(resendTimerRef.current);
-			clearInterval(resendIntervalRef.current);
-		};
+			resetResendIn(true)
+			clearTimeout(resendTimerRef.current)
+			clearInterval(resendIntervalRef.current)
+		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+	}, [])
 
 	return (
 		<Form {...form}>
@@ -544,7 +558,11 @@ const OTPForm = ({ onSubmit, loading, phoneNumber, editNumber }) => {
 				<div className="flex flex-col gap-2">
 					<div className="flex flex-col gap-4 px-8">
 						<div className="relative aspect-[2.8/1] w-32">
-							<Image src="/logo.png" alt="12th Class" fill />
+							<Image
+								src="/logo.png"
+								alt="12th Class"
+								fill
+							/>
 						</div>
 						<div className="flex flex-col text-sm">
 							<span className="text-lg font-bold text-blue-600">
@@ -634,17 +652,17 @@ const OTPForm = ({ onSubmit, loading, phoneNumber, editNumber }) => {
 				</div>
 			</form>
 		</Form>
-	);
-};
+	)
+}
 
 const RegisterForm = ({ onSubmit, loading }) => {
 	const form = useForm({
 		resolver: zodResolver(registerSchema),
 		defaultValues: async () => {
-			if (!process.env.NEXT_PUBLIC_IPDATA_API_KEY) return {};
+			if (!process.env.NEXT_PUBLIC_IPDATA_API_KEY) return {}
 
-			const ipdata = new IPData(process.env.NEXT_PUBLIC_IPDATA_API_KEY);
-			const ipInfo = await ipdata.lookup();
+			const ipdata = new IPData(process.env.NEXT_PUBLIC_IPDATA_API_KEY)
+			const ipInfo = await ipdata.lookup()
 
 			return {
 				name: undefined,
@@ -652,9 +670,9 @@ const RegisterForm = ({ onSubmit, loading }) => {
 				location: [ipInfo.city, ipInfo.region, ipInfo.country_code]
 					.filter(Boolean)
 					.join(", "),
-			};
+			}
 		},
-	});
+	})
 
 	return (
 		<Form {...form}>
@@ -665,7 +683,11 @@ const RegisterForm = ({ onSubmit, loading }) => {
 				<div className="flex flex-col gap-2">
 					<div className="flex flex-col gap-4 px-8">
 						<div className="relative aspect-[2.8/1] w-32">
-							<Image src="/logo.png" alt="12th Class" fill />
+							<Image
+								src="/logo.png"
+								alt="12th Class"
+								fill
+							/>
 						</div>
 						<div className="flex flex-col">
 							<div className="text-lg font-semibold text-blue-600">
@@ -686,7 +708,10 @@ const RegisterForm = ({ onSubmit, loading }) => {
 							<FormItem>
 								<FormLabel>Name</FormLabel>
 								<FormControl>
-									<Input placeholder="John Doe" {...field} />
+									<Input
+										placeholder="John Doe"
+										{...field}
+									/>
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -719,7 +744,7 @@ const RegisterForm = ({ onSubmit, loading }) => {
 						searchKey="title"
 						instance="location"
 						onSelect={(values, option) => {
-							form.setValue("location", option.title);
+							form.setValue("location", option.title)
 						}}
 					/>
 					<Button
@@ -732,10 +757,10 @@ const RegisterForm = ({ onSubmit, loading }) => {
 				</div>
 			</form>
 		</Form>
-	);
-};
+	)
+}
 
-const OTP_TIMER = 1000 * 60 * 0.5;
+const OTP_TIMER = 1000 * 60 * 0.5
 const OTP_ATTEMPTS = [
 	{ step: "send", message: "OTP sent successfully over SMS." },
 	{
@@ -748,18 +773,18 @@ const OTP_ATTEMPTS = [
 		message: "OTP resent again. Kindly check your messages.",
 		callMessage: "OTP resent again via call. Stay tuned for the call.",
 	},
-];
+]
 
 const numberSchema = z.object({
 	phoneNumber: z.string().length(10, {
 		message: "Invalid phone number",
 	}),
-});
+})
 const otpSchema = z.object({
 	otp: z.string(),
-});
+})
 const registerSchema = z.object({
 	name: z.string(),
 	email: z.string().email(),
 	location: z.string(),
-});
+})

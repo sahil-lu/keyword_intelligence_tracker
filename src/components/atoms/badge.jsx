@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
-import { cva } from "class-variance-authority";
-import React from "react";
+import { cn } from "@/lib/utils"
+import { cva } from "class-variance-authority"
+import React from "react"
 
 const badgeVariants = cva(
 	"inline-flex items-center gap-1 rounded-md h-5 px-1.5 py-0.5 font-medium ring-1 ring-inset capitalize whitespace-nowrap text-2xs",
@@ -56,7 +56,7 @@ const badgeVariants = cva(
 			capitalize: true,
 		},
 	}
-);
+)
 
 const Badge = ({
 	children,
@@ -75,6 +75,6 @@ const Badge = ({
 	>
 		{children}
 	</span>
-);
+)
 
-export default Badge;
+export default Badge

@@ -1,40 +1,40 @@
-"use client";
+"use client"
 
-import { cn } from "@/lib/utils";
-import { Button } from "@/ui/button";
-import { Calendar } from "@/ui/calendar";
+import { cn } from "@/lib/utils"
+import { Button } from "@/ui/button"
+import { Calendar } from "@/ui/calendar"
 import {
 	FormControl,
 	FormField,
 	FormItem,
 	FormLabel,
 	FormMessage,
-} from "@/ui/form";
-import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+} from "@/ui/form"
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover"
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@/ui/select";
-import { addMonths, format, setMonth, setYear, subYears } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+} from "@/ui/select"
+import { addMonths, format, setMonth, setYear, subYears } from "date-fns"
+import { CalendarIcon } from "lucide-react"
 
 const months = Array.from({ length: 12 }, (_, i) =>
 	format(addMonths(new Date(2020, 0, 1), i), "MMMM")
-);
+)
 
 const years = Array.from({ length: 100 }, (_, i) =>
 	Number(format(subYears(new Date(), i), "yyyy"))
-);
+)
 
 const DatePicker = ({ form, name, label }) => {
-	const handleChange = (field, type) => (val) => {
-		const date = field.value ?? new Date();
-		const modifier = type === "month" ? setMonth : setYear;
-		field.onChange(type === "date" ? val : modifier(date, Number(val)));
-	};
+	const handleChange = (field, type) => val => {
+		const date = field.value ?? new Date()
+		const modifier = type === "month" ? setMonth : setYear
+		field.onChange(type === "date" ? val : modifier(date, Number(val)))
+	}
 
 	return (
 		<div className="flex h-fit">
@@ -44,7 +44,7 @@ const DatePicker = ({ form, name, label }) => {
 				render={({ field }) => {
 					const dateValue = field.value
 						? new Date(field.value)
-						: new Date();
+						: new Date()
 					return (
 						<FormItem className="flex flex-1 flex-col">
 							<FormLabel>{label}</FormLabel>
@@ -112,7 +112,7 @@ const DatePicker = ({ form, name, label }) => {
 													/>
 												</SelectTrigger>
 												<SelectContent>
-													{years.map((year) => (
+													{years.map(year => (
 														<SelectItem
 															key={year}
 															value={`${year}`}
@@ -124,7 +124,8 @@ const DatePicker = ({ form, name, label }) => {
 											</Select>
 										</div>
 										<Calendar
-											mode="single" selected={dateValue}
+											mode="single"
+											selected={dateValue}
 											onSelect={field.onChange}
 										/>
 									</div>
@@ -132,11 +133,11 @@ const DatePicker = ({ form, name, label }) => {
 							</Popover>
 							<FormMessage />
 						</FormItem>
-					);
+					)
 				}}
 			/>
 		</div>
-	);
-};
+	)
+}
 
-export default DatePicker;
+export default DatePicker

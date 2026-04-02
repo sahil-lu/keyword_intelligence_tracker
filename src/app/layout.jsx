@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils"
 import Analytics from "@/providers/analytics"
+import { FirebaseAuthProvider } from "@/providers/firebase-auth-provider"
 import QueryParamsProvider from "@/providers/queryParams"
 import { TooltipProvider } from "@/ui/tooltip"
 import { Geist } from "next/font/google"
@@ -20,34 +21,36 @@ export const viewport = {
 }
 
 export const metadata = {
-	title: "Keyword_intelligence_radar",
-	description: "Keyword_intelligence_radar",
+	title: "Keyword Intelligence Radar",
+	description: "Keyword monitoring, scans, and AI reports",
 }
 
 export default function RootLayout({ children }) {
 	return (
-			<html
-				lang="en"
+		<html
+			lang="en"
+			suppressHydrationWarning
+		>
+			<body
+				className={cn(
+					"h-dvh w-screen overflow-hidden bg-white text-gray-950 antialiased dark:bg-gray-950 dark:text-gray-50",
+					geist.className
+				)}
 				suppressHydrationWarning
 			>
-				<body
-					className={cn(
-						"h-dvh w-screen overflow-hidden bg-white dark:bg-gray-950 text-gray-950 dark:text-gray-50 antialiased",
-						geist.className
-					)}
-					suppressHydrationWarning
-				>
-					<Suspense>
-						<QueryParamsProvider />
-					</Suspense>
-					<TooltipProvider>
-						<div className="flex h-full flex-col overflow-hidden">
+				<Suspense>
+					<QueryParamsProvider />
+				</Suspense>
+				<TooltipProvider>
+					<FirebaseAuthProvider>
+						<div className="flex h-dvh flex-col overflow-hidden">
 							{children}
 						</div>
-						<Toaster richColors />
-					</TooltipProvider>
-					<Analytics />
-				</body>
-			</html>
+					</FirebaseAuthProvider>
+					<Toaster richColors />
+				</TooltipProvider>
+				<Analytics />
+			</body>
+		</html>
 	)
 }

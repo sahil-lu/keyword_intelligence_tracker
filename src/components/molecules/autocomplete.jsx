@@ -5,11 +5,11 @@ import Badge from "@/atoms/badge"
 import { cn, getNestedValue, getType } from "@/lib/utils"
 import { Command, CommandGroup, CommandItem, CommandList } from "@/ui/command"
 import {
-    FormDescription,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
+	FormDescription,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
 } from "@/ui/form"
 import { Command as CommandPrimitive } from "cmdk"
 import { Check, X } from "lucide-react"
@@ -214,7 +214,7 @@ const Autocomplete = ({
 													{option.title}
 													<button
 														type="button"
-														className="ring-offset-white focus:ring-neutral-400 ml-1 rounded-full outline-hidden focus:ring-2 focus:ring-offset-2"
+														className="ml-1 rounded-full ring-offset-white outline-hidden focus:ring-2 focus:ring-neutral-400 focus:ring-offset-2"
 														onMouseDown={e => {
 															e.preventDefault()
 															e.stopPropagation()
@@ -225,7 +225,7 @@ const Autocomplete = ({
 															)(option)
 														}
 													>
-														<X className="hover:text-neutral-900 h-3 w-3 text-neutral-500" />
+														<X className="h-3 w-3 text-neutral-500 hover:text-neutral-900" />
 													</button>
 												</Badge>
 											))}

@@ -1,6 +1,6 @@
-import useMediaQuery from "@/hooks/useMediaQuery";
-import { getType } from "@/lib";
-import { cn } from "@/lib/utils";
+import useMediaQuery from "@/hooks/useMediaQuery"
+import { getType } from "@/lib"
+import { cn } from "@/lib/utils"
 import {
 	Dialog,
 	DialogContent,
@@ -8,7 +8,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 	DialogTrigger,
-} from "@/ui/dialog";
+} from "@/ui/dialog"
 import {
 	Drawer,
 	DrawerContent,
@@ -16,17 +16,17 @@ import {
 	DrawerHeader,
 	DrawerTitle,
 	DrawerTrigger,
-} from "@/ui/drawer";
+} from "@/ui/drawer"
 
 const DEFAULT_RESTRICTION = {
 	min: true,
 	max: true,
-};
+}
 
 const DEFAULT_CLASS_NAMES = {
 	dialog: "sm:rounded-2xl",
 	drawer: "",
-};
+}
 
 const DialogDrawer = ({
 	children,
@@ -42,7 +42,7 @@ const DialogDrawer = ({
 	dismissible = true,
 	containerChildren: ContainerChildren = null,
 }) => {
-	const isMD = useMediaQuery("(min-width: 768px)");
+	const isMD = useMediaQuery("(min-width: 768px)")
 	const restrictions = {
 		min:
 			getType(restrict.min) === "Boolean"
@@ -56,7 +56,7 @@ const DialogDrawer = ({
 					? "max-h-full"
 					: ""
 				: restrict.max,
-	};
+	}
 
 	const containerClassName =
 		getType(containerClassNames) === "String"
@@ -69,27 +69,27 @@ const DialogDrawer = ({
 						DEFAULT_CLASS_NAMES.drawer,
 						containerClassNames,
 					].join(" "),
-			  }
+				}
 			: {
 					...DEFAULT_CLASS_NAMES,
 					...containerClassNames,
-			  };
+				}
 
 	const className =
 		getType(containerClassNames) === "String"
 			? {
 					dialog: [DEFAULT_CLASS_NAMES.dialog, classNames].join(" "),
 					drawer: [DEFAULT_CLASS_NAMES.drawer, classNames].join(" "),
-			  }
+				}
 			: {
 					...DEFAULT_CLASS_NAMES,
 					...classNames,
-			  };
+				}
 
-	const onOpenChange = (open) => {
-		close?.(open);
-		if (!open) onClose?.(open);
-	};
+	const onOpenChange = open => {
+		close?.(open)
+		if (!open) onClose?.(open)
+	}
 
 	return isMD ? (
 		<Dialog
@@ -105,11 +105,11 @@ const DialogDrawer = ({
 					containerClassName.dialog
 				)}
 				dismissible={dismissible}
-				onInteractOutside={(e) => {
-					if (!dismissible) e.preventDefault();
+				onInteractOutside={e => {
+					if (!dismissible) e.preventDefault()
 				}}
-				onEscapeKeyDown={(e) => {
-					if (!dismissible) e.preventDefault();
+				onEscapeKeyDown={e => {
+					if (!dismissible) e.preventDefault()
 				}}
 			>
 				{title || description ? (
@@ -176,7 +176,7 @@ const DialogDrawer = ({
 				{ContainerChildren && <ContainerChildren />}
 			</DrawerContent>
 		</Drawer>
-	);
-};
+	)
+}
 
-export default DialogDrawer;
+export default DialogDrawer
