@@ -3,6 +3,9 @@ import cors from "cors"
 import express from "express"
 import projectsRouter from "./routes/projects.js"
 import reportsRouter from "./routes/reports.js"
+import findingsRouter from "./routes/findings.js"
+import runsRouter from "./routes/runs.js"
+import documentsRouter from "./routes/documents.js"
 import { startScheduler } from "./services/scheduler.js"
 import { fileURLToPath } from "node:url"
 import path from "node:path"
@@ -27,8 +30,10 @@ app.get("/health", (_req, res) => {
 	res.json({ ok: true, service: "keyword-intelligence-radar-api" })
 })
 
-// Register specific routes before generic /:id handlers.
 app.use("/projects", reportsRouter)
+app.use("/projects", findingsRouter)
+app.use("/projects", runsRouter)
+app.use("/projects", documentsRouter)
 app.use("/projects", projectsRouter)
 
 function boot() {

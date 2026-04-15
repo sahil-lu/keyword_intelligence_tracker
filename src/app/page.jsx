@@ -1,6 +1,6 @@
 "use client"
 
-import { MonitoringDashboard } from "@/components/radar/monitoring-dashboard"
+import { DashboardLayout } from "@/components/radar/dashboard-layout"
 import { useFirebaseAuth } from "@/providers/firebase-auth-provider"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
@@ -19,20 +19,16 @@ export default function Home() {
 	if (loading) {
 		return (
 			<div className="flex flex-1 items-center justify-center">
-				<p className="text-oklch(0.45 0 0) dark:text-oklch(0.75 0 0) text-sm">
-					Loading…
-				</p>
+				<p className="text-sm text-zinc-500">Loading…</p>
 			</div>
 		)
 	}
 
-	if (!user) {
-		return null
-	}
+	if (!user) return null
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<MonitoringDashboard />
+			<DashboardLayout />
 		</div>
 	)
 }

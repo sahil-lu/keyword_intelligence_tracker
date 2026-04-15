@@ -4,9 +4,6 @@ import { getFirestore } from "../db/firebase.js"
 const router = Router()
 const db = () => getFirestore()
 
-/**
- * Latest report for a project (GET /projects/:id/report when mounted at /projects).
- */
 router.get("/:id/report", async (req, res) => {
 	try {
 		const projectId = req.params.id
@@ -32,12 +29,32 @@ router.get("/:id/report", async (req, res) => {
 
 		const doc = snap.docs[0]
 		const data = doc.data()
+
+		let insights = []
+		if (data.runId) {
+			const insightsSnap = await db()
+				.collection("projects")
+				.doc(projectId)
+				.collection("insights")
+				.where("runId", "==", data.runId)
+				.limit(100)
+				.get()
+			insights = insightsSnap.docs
+				.map(d => ({ id: d.id, ...d.data() }))
+				.sort((a, b) => {
+					const ta = a.createdAt?._seconds || 0
+					const tb = b.createdAt?._seconds || 0
+					return tb - ta
+				})
+		}
+
 		return res.json({
 			id: doc.id,
 			projectId,
+			runId: data.runId || null,
 			createdAt: data.createdAt,
 			report: data.report,
-			insights: data.insights,
+			insights,
 		})
 	} catch (err) {
 		console.error("GET /projects/:id/report", err)

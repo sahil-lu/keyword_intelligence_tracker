@@ -1,15 +1,18 @@
 /**
- * MVP change detection: URL seen before vs new.
+ * Compares items against existing document records.
+ * Supports content-hash based detection: NEW → never seen, UPDATED → hash changed, EXISTING → unchanged.
  */
-export function detectChanges(newItems, existingItems) {
-	const existingUrls = new Set(
-		(existingItems || [])
-			.map(x => (typeof x?.url === "string" ? x.url.trim() : ""))
-			.filter(Boolean)
-	)
-
-	return newItems.map(item => ({
-		...item,
-		changeType: existingUrls.has(item.url) ? "existing" : "new",
-	}))
+export function detectChanges(items, existingDocs = {}) {
+	return items.map(item => {
+		const existing = existingDocs[item.url]
+		if (!existing) return { ...item, change_type: "new" }
+		if (
+			item.hash &&
+			existing.contentHash &&
+			existing.contentHash !== item.hash
+		) {
+			return { ...item, change_type: "updated" }
+		}
+		return { ...item, change_type: "existing" }
+	})
 }
