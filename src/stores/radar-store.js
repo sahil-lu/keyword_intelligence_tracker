@@ -12,9 +12,9 @@ export const useRadarStore = create((set, get) => ({
 	report: null,
 	reportLoading: false,
 
-	findings: [],
-	findingsLoading: false,
-	findingsFilter: {},
+	signals: [],
+	signalsLoading: false,
+	signalsFilter: {},
 
 	runs: [],
 	runsLoading: false,
@@ -29,7 +29,7 @@ export const useRadarStore = create((set, get) => ({
 		const { selectedProjectId } = get()
 		if (!selectedProjectId) return
 		if (view === "report") get().fetchReport()
-		if (view === "findings") get().fetchFindings()
+		if (view === "signals") get().fetchSignals()
 		if (view === "runs") get().fetchRuns()
 		if (view === "documents") get().fetchDocuments()
 	},
@@ -54,13 +54,13 @@ export const useRadarStore = create((set, get) => ({
 		set({
 			selectedProjectId: id,
 			report: null,
-			findings: [],
+			signals: [],
 			runs: [],
 			documents: [],
 		})
 		const { activeView } = get()
 		if (activeView === "report") get().fetchReport()
-		else if (activeView === "findings") get().fetchFindings()
+		else if (activeView === "signals") get().fetchSignals()
 		else if (activeView === "runs") get().fetchRuns()
 		else if (activeView === "documents") get().fetchDocuments()
 	},
@@ -109,27 +109,27 @@ export const useRadarStore = create((set, get) => ({
 		}
 	},
 
-	fetchFindings: async filters => {
-		const { selectedProjectId, findingsFilter } = get()
+	fetchSignals: async filters => {
+		const { selectedProjectId, signalsFilter } = get()
 		if (!selectedProjectId) return
-		const f = filters || findingsFilter
-		set({ findingsLoading: true, findingsFilter: f })
+		const f = filters || signalsFilter
+		set({ signalsLoading: true, signalsFilter: f })
 		try {
-			const data = await radarApi.getFindings(selectedProjectId, f)
-			set({ findings: data, findingsLoading: false })
+			const data = await radarApi.getSignals(selectedProjectId, f)
+			set({ signals: data, signalsLoading: false })
 		} catch {
-			set({ findings: [], findingsLoading: false })
+			set({ signals: [], signalsLoading: false })
 		}
 	},
 
-	setFindingsFilter: filter => {
-		const current = get().findingsFilter
+	setSignalsFilter: filter => {
+		const current = get().signalsFilter
 		const next = { ...current, ...filter }
 		Object.keys(next).forEach(k => {
 			if (!next[k]) delete next[k]
 		})
-		set({ findingsFilter: next })
-		get().fetchFindings(next)
+		set({ signalsFilter: next })
+		get().fetchSignals(next)
 	},
 
 	fetchRuns: async () => {

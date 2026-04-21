@@ -3,7 +3,7 @@ import cors from "cors"
 import express from "express"
 import projectsRouter from "./routes/projects.js"
 import reportsRouter from "./routes/reports.js"
-import findingsRouter from "./routes/findings.js"
+import signalsRouter from "./routes/signals.js"
 import runsRouter from "./routes/runs.js"
 import documentsRouter from "./routes/documents.js"
 import { startScheduler } from "./services/scheduler.js"
@@ -31,7 +31,7 @@ app.get("/health", (_req, res) => {
 })
 
 app.use("/projects", reportsRouter)
-app.use("/projects", findingsRouter)
+app.use("/projects", signalsRouter)
 app.use("/projects", runsRouter)
 app.use("/projects", documentsRouter)
 app.use("/projects", projectsRouter)

@@ -36,13 +36,13 @@ export const radarApi = {
 
 	getReport: id => request(`/projects/${id}/report`),
 
-	getFindings: (id, filters = {}) => {
+	getSignals: (id, filters = {}) => {
 		const params = new URLSearchParams()
 		if (filters.priority) params.set("priority", filters.priority)
-		if (filters.category) params.set("category", filters.category)
+		if (filters.agent) params.set("agent", filters.agent)
 		if (filters.change_type) params.set("change_type", filters.change_type)
 		const qs = params.toString()
-		return request(`/projects/${id}/findings${qs ? `?${qs}` : ""}`)
+		return request(`/projects/${id}/signals${qs ? `?${qs}` : ""}`)
 	},
 
 	getRuns: id => request(`/projects/${id}/runs`),

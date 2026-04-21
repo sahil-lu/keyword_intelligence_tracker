@@ -2,15 +2,24 @@ import OpenAI from "openai"
 
 const client = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+const VALID_AGENTS = new Set([
+	"jobs",
+	"skills",
+	"policy",
+	"program",
+	"competitor",
+])
+
 export async function analyzeContent(text, context = {}) {
 	const trimmed = (text || "").slice(0, 10_000)
 	if (!trimmed.trim()) {
 		return {
-			summary: "No readable content.",
-			entity: "unknown",
-			category: "other",
-			why_it_matters: "Nothing to analyze.",
-			suggested_action: "Skip or try another URL.",
+			title: "No readable content",
+			agent: "other",
+			what_changed: "No content available for analysis.",
+			impact_on_itm: "",
+			recommended_action: "",
+			priority: "low",
 		}
 	}
 
@@ -19,27 +28,38 @@ export async function analyzeContent(text, context = {}) {
 		? context.competitors.join(", ")
 		: ""
 
-	const prompt = `You analyze web content for a keyword monitoring product.
-Keyword: ${keyword}
-Competitors (names may appear in text): ${competitors}
+	const prompt = `You are an AI strategy analyst for ITM Institute.
+
+Analyze the content below.
+
+Keyword context: ${keyword}
+Competitors: ${competitors}
 
 Content:
 """
 ${trimmed}
 """
 
-Return a single JSON object with these exact keys:
-- summary (string, 1-2 concise sentences about the content)
-- entity (string, the main company/product/person this content is about)
-- category (string, exactly one of: pricing, product, news, analysis, review, comparison, partnership, regulation, other)
-- why_it_matters (string, 1 sentence explaining relevance to the keyword/market)
-- suggested_action (string, 1 sentence actionable recommendation)`
+Return JSON:
+
+{
+  "title": "",
+  "agent": "jobs | skills | policy | program | competitor",
+  "what_changed": "",
+  "impact_on_itm": "",
+  "recommended_action": "",
+  "priority": "high | medium | low"
+}`
 
 	const completion = await client().chat.completions.create({
 		model: process.env.OPENAI_MODEL || "gpt-4o-mini",
 		response_format: { type: "json_object" },
 		messages: [
-			{ role: "system", content: "You output only valid JSON objects." },
+			{
+				role: "system",
+				content:
+					"You are an AI strategy analyst for ITM Institute. You output only valid JSON objects.",
+			},
 			{ role: "user", content: prompt },
 		],
 		temperature: 0.3,
@@ -51,33 +71,30 @@ Return a single JSON object with these exact keys:
 		parsed = JSON.parse(raw)
 	} catch {
 		parsed = {
-			summary: raw.slice(0, 500),
-			entity: "unknown",
-			category: "other",
-			why_it_matters: "Parse error from model output.",
-			suggested_action: "Re-run or inspect raw model output.",
+			title: "Parse error",
+			agent: "other",
+			what_changed: raw.slice(0, 500),
+			impact_on_itm: "",
+			recommended_action: "",
+			priority: "low",
 		}
 	}
 
-	const VALID_CATEGORIES = new Set([
-		"pricing",
-		"product",
-		"news",
-		"analysis",
-		"review",
-		"comparison",
-		"partnership",
-		"regulation",
-		"other",
-	])
-
-	const rawCategory = String(parsed.category ?? "other").toLowerCase()
+	const rawAgent = String(parsed.agent ?? "other")
+		.toLowerCase()
+		.trim()
+	const rawPriority = String(parsed.priority ?? "low")
+		.toLowerCase()
+		.trim()
 
 	return {
-		summary: String(parsed.summary ?? ""),
-		entity: String(parsed.entity ?? "unknown"),
-		category: VALID_CATEGORIES.has(rawCategory) ? rawCategory : "other",
-		why_it_matters: String(parsed.why_it_matters ?? ""),
-		suggested_action: String(parsed.suggested_action ?? ""),
+		title: String(parsed.title ?? ""),
+		agent: VALID_AGENTS.has(rawAgent) ? rawAgent : "other",
+		what_changed: String(parsed.what_changed ?? ""),
+		impact_on_itm: String(parsed.impact_on_itm ?? ""),
+		recommended_action: String(parsed.recommended_action ?? ""),
+		priority: ["high", "medium", "low"].includes(rawPriority)
+			? rawPriority.toUpperCase()
+			: "LOW",
 	}
 }

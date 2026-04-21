@@ -7,31 +7,98 @@ import { Skeleton } from "@/ui/skeleton"
 import { cn } from "@/lib/utils"
 import {
 	AlertTriangle,
-	ArrowUpRight,
-	BarChart3,
-	CheckCircle2,
+	ArrowRight,
 	ExternalLink,
 	FileText,
 	Globe,
 	ListChecks,
+	Shield,
 	Sparkles,
+	Target,
 	TrendingUp,
+	Zap,
 } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
+import {
+	PieChart,
+	Pie,
+	Cell,
+	BarChart,
+	Bar,
+	XAxis,
+	YAxis,
+	Tooltip,
+	ResponsiveContainer,
+} from "recharts"
+
+const AGENT_CONFIG = {
+	jobs: {
+		label: "Jobs",
+		color: "bg-blue-500",
+		hex: "#3b82f6",
+		textColor: "text-blue-700 dark:text-blue-300",
+		bgColor: "bg-blue-50 dark:bg-blue-500/10",
+		borderColor: "border-blue-200 dark:border-blue-500/30",
+		icon: Target,
+	},
+	skills: {
+		label: "Skills",
+		color: "bg-violet-500",
+		hex: "#8b5cf6",
+		textColor: "text-violet-700 dark:text-violet-300",
+		bgColor: "bg-violet-50 dark:bg-violet-500/10",
+		borderColor: "border-violet-200 dark:border-violet-500/30",
+		icon: Zap,
+	},
+	policy: {
+		label: "Policy",
+		color: "bg-amber-500",
+		hex: "#f59e0b",
+		textColor: "text-amber-700 dark:text-amber-300",
+		bgColor: "bg-amber-50 dark:bg-amber-500/10",
+		borderColor: "border-amber-200 dark:border-amber-500/30",
+		icon: Shield,
+	},
+	program: {
+		label: "Program",
+		color: "bg-emerald-500",
+		hex: "#10b981",
+		textColor: "text-emerald-700 dark:text-emerald-300",
+		bgColor: "bg-emerald-50 dark:bg-emerald-500/10",
+		borderColor: "border-emerald-200 dark:border-emerald-500/30",
+		icon: FileText,
+	},
+	competitor: {
+		label: "Competitor",
+		color: "bg-red-500",
+		hex: "#ef4444",
+		textColor: "text-red-700 dark:text-red-300",
+		bgColor: "bg-red-50 dark:bg-red-500/10",
+		borderColor: "border-red-200 dark:border-red-500/30",
+		icon: TrendingUp,
+	},
+	other: {
+		label: "Other",
+		color: "bg-zinc-500",
+		hex: "#71717a",
+		textColor: "text-zinc-600 dark:text-zinc-400",
+		bgColor: "bg-zinc-50 dark:bg-zinc-800",
+		borderColor: "border-zinc-200 dark:border-zinc-700",
+		icon: Globe,
+	},
+}
+
+const PRIORITY_COLORS = {
+	HIGH: "#ef4444",
+	MEDIUM: "#f59e0b",
+	LOW: "#a1a1aa",
+}
 
 function priorityColor(p) {
 	if (p === "HIGH")
 		return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
 	if (p === "MEDIUM")
 		return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
-	return "border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-}
-
-function changeColor(t) {
-	if (t === "new")
-		return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
-	if (t === "updated")
-		return "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300"
 	return "border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
 }
 
@@ -74,7 +141,7 @@ function ReportSkeleton() {
 					/>
 				))}
 			</div>
-			<Skeleton className="h-24 w-full rounded-xl" />
+			<Skeleton className="h-48 w-full rounded-xl" />
 			<div className="grid grid-cols-2 gap-4">
 				{[1, 2, 3, 4].map(i => (
 					<Skeleton
@@ -97,10 +164,322 @@ function EmptyReport() {
 				No report yet
 			</p>
 			<p className="mt-1 max-w-xs text-xs text-zinc-500">
-				Run a scan to generate your first intelligence report from the
-				web.
+				Run a scan to generate your first intelligence report.
 			</p>
 		</div>
+	)
+}
+
+function CustomTooltip({ active, payload }) {
+	if (!active || !payload?.length) return null
+	const d = payload[0].payload
+	return (
+		<div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+			<p className="font-semibold text-zinc-900 dark:text-zinc-50">
+				{d.name}
+			</p>
+			<p className="text-zinc-500">{d.value} signals</p>
+		</div>
+	)
+}
+
+function PriorityDonut({ stats }) {
+	const data = useMemo(
+		() =>
+			[
+				{ name: "High", value: stats.high || 0 },
+				{ name: "Medium", value: stats.medium || 0 },
+				{ name: "Low", value: stats.low || 0 },
+			].filter(d => d.value > 0),
+		[stats]
+	)
+
+	if (data.length === 0) return null
+	const total = data.reduce((s, d) => s + d.value, 0)
+	const colors = [
+		PRIORITY_COLORS.HIGH,
+		PRIORITY_COLORS.MEDIUM,
+		PRIORITY_COLORS.LOW,
+	]
+
+	return (
+		<div className="flex flex-col items-center">
+			<p className="mb-2 text-xs font-semibold tracking-wider text-zinc-400 uppercase">
+				Priority Split
+			</p>
+			<div className="relative">
+				<ResponsiveContainer
+					width={140}
+					height={140}
+				>
+					<PieChart>
+						<Pie
+							data={data}
+							cx="50%"
+							cy="50%"
+							innerRadius={42}
+							outerRadius={62}
+							paddingAngle={3}
+							dataKey="value"
+							strokeWidth={0}
+						>
+							{data.map((_, i) => (
+								<Cell
+									key={i}
+									fill={colors[i]}
+								/>
+							))}
+						</Pie>
+						<Tooltip content={<CustomTooltip />} />
+					</PieChart>
+				</ResponsiveContainer>
+				<div className="absolute inset-0 flex flex-col items-center justify-center">
+					<span className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+						{total}
+					</span>
+					<span className="text-[10px] text-zinc-400">total</span>
+				</div>
+			</div>
+			<div className="mt-2 flex gap-3">
+				{data.map((d, i) => (
+					<div
+						key={d.name}
+						className="flex items-center gap-1"
+					>
+						<span
+							className="size-2 rounded-full"
+							style={{ backgroundColor: colors[i] }}
+						/>
+						<span className="text-[10px] text-zinc-500">
+							{d.name} ({d.value})
+						</span>
+					</div>
+				))}
+			</div>
+		</div>
+	)
+}
+
+function AgentBarChart({ agentSummary }) {
+	const data = useMemo(
+		() =>
+			(agentSummary || [])
+				.filter(a => a.agent !== "other")
+				.map(a => ({
+					name: (AGENT_CONFIG[a.agent] || AGENT_CONFIG.other).label,
+					value: a.count,
+					fill: (AGENT_CONFIG[a.agent] || AGENT_CONFIG.other).hex,
+				})),
+		[agentSummary]
+	)
+
+	if (data.length === 0) return null
+
+	return (
+		<div className="flex flex-col">
+			<p className="mb-2 text-xs font-semibold tracking-wider text-zinc-400 uppercase">
+				Signals by Agent
+			</p>
+			<ResponsiveContainer
+				width="100%"
+				height={160}
+			>
+				<BarChart
+					data={data}
+					layout="vertical"
+					margin={{ top: 0, right: 12, bottom: 0, left: 0 }}
+					barCategoryGap="20%"
+				>
+					<XAxis
+						type="number"
+						hide
+					/>
+					<YAxis
+						type="category"
+						dataKey="name"
+						width={80}
+						tick={{ fontSize: 11, fill: "#71717a" }}
+						axisLine={false}
+						tickLine={false}
+					/>
+					<Tooltip content={<CustomTooltip />} />
+					<Bar
+						dataKey="value"
+						radius={[0, 4, 4, 0]}
+						barSize={18}
+					>
+						{data.map((d, i) => (
+							<Cell
+								key={i}
+								fill={d.fill}
+							/>
+						))}
+					</Bar>
+				</BarChart>
+			</ResponsiveContainer>
+		</div>
+	)
+}
+
+function AgentGrid({ agentSummary }) {
+	const agents = (agentSummary || []).filter(a => a.agent !== "other")
+	if (agents.length === 0) return null
+
+	return (
+		<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+			{agents.map(a => {
+				const config = AGENT_CONFIG[a.agent] || AGENT_CONFIG.other
+				const Icon = config.icon
+				const total = a.count || 0
+				const high = a.high_count || 0
+				const pct = total > 0 ? Math.round((high / total) * 100) : 0
+
+				return (
+					<div
+						key={a.agent}
+						className={cn(
+							"flex flex-col rounded-xl border p-3 transition-shadow hover:shadow-md",
+							config.borderColor,
+							"bg-white dark:bg-zinc-900"
+						)}
+					>
+						<div className="flex items-center gap-2">
+							<div
+								className={cn(
+									"flex size-7 items-center justify-center rounded-lg border",
+									config.bgColor,
+									config.borderColor
+								)}
+							>
+								<Icon
+									className={cn("size-3.5", config.textColor)}
+								/>
+							</div>
+							<span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+								{config.label}
+							</span>
+						</div>
+
+						<p className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+							{total}
+						</p>
+						<p className="text-[10px] text-zinc-400">
+							signal{total !== 1 ? "s" : ""} detected
+						</p>
+
+						{/* Priority bar */}
+						<div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+							{total > 0 && (
+								<div
+									className="h-full rounded-full bg-red-500 transition-all"
+									style={{ width: `${pct}%` }}
+								/>
+							)}
+						</div>
+						<p className="mt-0.5 text-[10px] text-zinc-400">
+							{high > 0
+								? `${high} high priority (${pct}%)`
+								: "No high priority"}
+						</p>
+
+						{a.top_signal && (
+							<p className="mt-2 line-clamp-1 border-t border-zinc-100 pt-2 text-[11px] text-zinc-500 dark:border-zinc-800">
+								{a.top_signal.title}
+							</p>
+						)}
+					</div>
+				)
+			})}
+		</div>
+	)
+}
+
+function AgentBadge({ agent }) {
+	const config = AGENT_CONFIG[agent] || AGENT_CONFIG.other
+	return (
+		<span
+			className={cn(
+				"inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+				config.bgColor,
+				config.borderColor,
+				config.textColor
+			)}
+		>
+			<span className={cn("size-1.5 rounded-full", config.color)} />
+			{config.label}
+		</span>
+	)
+}
+
+function SignalCard({ signal }) {
+	const s = signal
+	return (
+		<article className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
+			<div className="flex items-start justify-between gap-2">
+				<div className="flex items-center gap-2">
+					<AgentBadge agent={s.agent} />
+					<Badge
+						variant="outline"
+						className={cn(
+							"text-[10px] uppercase",
+							priorityColor(s.priority)
+						)}
+					>
+						{s.priority}
+					</Badge>
+				</div>
+				{s.url && (
+					<a
+						href={s.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="rounded p-1 text-zinc-400 opacity-0 transition-all group-hover:opacity-100 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+					>
+						<ExternalLink className="size-3.5" />
+					</a>
+				)}
+			</div>
+
+			<h3 className="mt-2 text-sm leading-snug font-semibold text-zinc-900 dark:text-zinc-50">
+				{s.title || "Untitled"}
+			</h3>
+
+			<div className="mt-3 space-y-2">
+				<div className="rounded-lg border border-zinc-100 bg-zinc-50/50 p-2.5 dark:border-zinc-800 dark:bg-zinc-800/50">
+					<p className="text-[10px] font-semibold tracking-wider text-zinc-400 uppercase">
+						What Changed
+					</p>
+					<p className="mt-1 text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">
+						{s.what_changed}
+					</p>
+				</div>
+
+				<div className="rounded-lg border border-amber-100 bg-amber-50/50 p-2.5 dark:border-amber-500/20 dark:bg-amber-500/5">
+					<p className="text-[10px] font-semibold tracking-wider text-amber-600 uppercase dark:text-amber-400">
+						Impact on ITM
+					</p>
+					<p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-200">
+						{s.impact_on_itm}
+					</p>
+				</div>
+
+				<div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-2.5 dark:border-emerald-500/20 dark:bg-emerald-500/5">
+					<p className="text-[10px] font-semibold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
+						Recommended Action
+					</p>
+					<p className="mt-1 flex items-start gap-1.5 text-sm leading-relaxed font-medium text-emerald-800 dark:text-emerald-200">
+						<ArrowRight className="mt-0.5 size-3.5 shrink-0" />
+						{s.recommended_action}
+					</p>
+				</div>
+			</div>
+
+			<div className="mt-auto flex items-center justify-between pt-3">
+				<span className="truncate text-[11px] text-zinc-400">
+					{hostOf(s.url)}
+				</span>
+			</div>
+		</article>
 	)
 }
 
@@ -137,7 +516,7 @@ export function ReportView() {
 			<div className="flex flex-wrap gap-3">
 				<StatChip
 					icon={Globe}
-					label="Total sources"
+					label="Total signals"
 					value={stats.total ?? "—"}
 				/>
 				<StatChip
@@ -146,171 +525,71 @@ export function ReportView() {
 					value={stats.new ?? "—"}
 				/>
 				<StatChip
-					icon={ArrowUpRight}
-					label="Updated"
-					value={stats.updated ?? "—"}
-				/>
-				<StatChip
 					icon={AlertTriangle}
 					label="High priority"
 					value={stats.high ?? "—"}
 					accent="border-red-200 bg-red-50/50 dark:border-red-500/20 dark:bg-red-500/5"
 				/>
+				<StatChip
+					icon={Shield}
+					label="Discarded"
+					value={stats.discarded ?? "—"}
+					accent="border-zinc-300 bg-zinc-100/50 dark:border-zinc-600 dark:bg-zinc-800/50"
+				/>
 			</div>
+
+			{/* Visual overview — charts */}
+			<section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+				<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+					<PriorityDonut stats={stats} />
+					<AgentBarChart agentSummary={r.agent_summary} />
+				</div>
+			</section>
 
 			{/* Executive summary */}
 			<section className="space-y-3">
 				<SectionHeader
 					icon={Sparkles}
-					label="Executive Summary"
+					label="What Should ITM Do?"
 				/>
 				<div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
 					<p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
 						{r.executive_summary}
 					</p>
-					{r.strategic_insights && (
-						<p className="mt-3 border-t border-zinc-100 pt-3 text-sm leading-relaxed text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-							{r.strategic_insights}
-						</p>
-					)}
 				</div>
 			</section>
 
 			<Separator />
 
-			{/* Top findings */}
-			{r.top_findings?.length > 0 && (
+			{/* Agent grid */}
+			{r.agent_summary?.length > 0 && (
 				<section className="space-y-3">
 					<SectionHeader
-						icon={BarChart3}
-						label="Top Findings"
+						icon={Target}
+						label="Agent Overview"
 					/>
-					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-						{r.top_findings
-							.filter(f => f.priority !== "LOW")
-							.map((f, i) => (
-								<FindingCard
-									key={`${f.url}-${i}`}
-									finding={f}
-								/>
-							))}
-					</div>
+					<AgentGrid agentSummary={r.agent_summary} />
 				</section>
 			)}
 
-			{/* Competitor updates */}
-			{r.competitor_updates?.length > 0 && (
-				<>
-					<Separator />
-					<section className="space-y-3">
-						<SectionHeader
-							icon={TrendingUp}
-							label="Competitor Updates"
-						/>
-						<div className="space-y-4">
-							{r.competitor_updates.map((cu, i) => (
-								<div
-									key={`${cu.competitor}-${i}`}
-									className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
-								>
-									<h4 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-										{cu.competitor}
-									</h4>
-									<ul className="space-y-1.5">
-										{cu.insights.map((ci, j) => (
-											<li
-												key={j}
-												className="flex items-start gap-2 text-sm"
-											>
-												<Badge
-													variant="outline"
-													className={cn(
-														"mt-0.5 shrink-0 text-[10px]",
-														priorityColor(
-															ci.priority
-														)
-													)}
-												>
-													{ci.priority}
-												</Badge>
-												<span className="text-zinc-600 dark:text-zinc-300">
-													{ci.summary}
-												</span>
-											</li>
-										))}
-									</ul>
-								</div>
-							))}
-						</div>
-					</section>
-				</>
-			)}
+			<Separator />
 
-			{/* What changed */}
-			{r.what_changed?.length > 0 && (
-				<>
-					<Separator />
-					<section className="space-y-3">
-						<SectionHeader
-							icon={ArrowUpRight}
-							label="What Changed"
-						/>
-						<div className="space-y-2">
-							{r.what_changed.map((w, i) => (
-								<div
-									key={`${w.url}-${i}`}
-									className="flex items-start gap-3 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900"
-								>
-									<Badge
-										variant="outline"
-										className={cn(
-											"mt-0.5 shrink-0 text-[10px] uppercase",
-											changeColor(w.change_type)
-										)}
-									>
-										{w.change_type}
-									</Badge>
-									<div className="min-w-0 flex-1">
-										<p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-											{w.title}
-										</p>
-										<p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">
-											{w.summary}
-										</p>
-									</div>
-								</div>
-							))}
-						</div>
-					</section>
-				</>
-			)}
-
-			{/* Source breakdown */}
-			{r.source_breakdown?.length > 0 && (
-				<>
-					<Separator />
-					<section className="space-y-3">
-						<SectionHeader
-							icon={Globe}
-							label="Source Breakdown"
-						/>
-						<div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-							{r.source_breakdown.slice(0, 8).map((s, i) => (
-								<div
-									key={`${s.domain}-${i}`}
-									className="rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
-								>
-									<p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-										{s.domain}
-									</p>
-									<p className="text-xs text-zinc-500">
-										{s.count} source{s.count !== 1 && "s"}
-									</p>
-								</div>
-							))}
-						</div>
-					</section>
-				</>
+			{/* High priority signals */}
+			{r.top_findings?.length > 0 && (
+				<section className="space-y-3">
+					<SectionHeader
+						icon={AlertTriangle}
+						label="High Priority Signals"
+					/>
+					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+						{r.top_findings.map((s, i) => (
+							<SignalCard
+								key={`${s.url}-${i}`}
+								signal={s}
+							/>
+						))}
+					</div>
+				</section>
 			)}
 
 			{/* Recommendations */}
@@ -320,7 +599,7 @@ export function ReportView() {
 					<section className="space-y-3">
 						<SectionHeader
 							icon={ListChecks}
-							label="Recommendations"
+							label="Action Items"
 						/>
 						<ul className="space-y-2">
 							{r.recommendations.map((rec, i) => (
@@ -329,7 +608,7 @@ export function ReportView() {
 									className="flex gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/50"
 								>
 									<span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-										<CheckCircle2 className="size-3.5" />
+										<ArrowRight className="size-3.5" />
 									</span>
 									<div className="min-w-0 flex-1">
 										<p className="text-sm text-zinc-700 dark:text-zinc-200">
@@ -370,77 +649,5 @@ function SectionHeader({ icon: Icon, label }) {
 			</div>
 			{label}
 		</div>
-	)
-}
-
-function FindingCard({ finding }) {
-	const f = finding
-	return (
-		<article className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
-			<div className="flex items-start justify-between gap-2">
-				<h3 className="min-w-0 flex-1 text-sm leading-snug font-semibold text-zinc-900 dark:text-zinc-50">
-					{f.title || "Untitled"}
-				</h3>
-				<div className="flex shrink-0 gap-1.5">
-					<Badge
-						variant="outline"
-						className={cn(
-							"text-[10px] uppercase",
-							priorityColor(f.priority)
-						)}
-					>
-						{f.priority}
-					</Badge>
-					<Badge
-						variant="outline"
-						className={cn(
-							"text-[10px] uppercase",
-							changeColor(f.change_type)
-						)}
-					>
-						{f.change_type}
-					</Badge>
-				</div>
-			</div>
-
-			<div className="mt-1.5 flex items-center gap-2">
-				{f.category && (
-					<span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-						{f.category}
-					</span>
-				)}
-				{f.entity && f.entity !== "unknown" && (
-					<span className="text-[11px] text-zinc-400">
-						{f.entity}
-					</span>
-				)}
-			</div>
-
-			<p className="mt-2 line-clamp-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-				{f.summary}
-			</p>
-
-			{f.why_it_matters && (
-				<p className="mt-1.5 text-xs text-zinc-400 italic">
-					{f.why_it_matters}
-				</p>
-			)}
-
-			<div className="mt-auto flex items-center justify-between pt-3">
-				<span className="truncate text-[11px] text-zinc-400">
-					{hostOf(f.url)}
-				</span>
-				{f.url && (
-					<a
-						href={f.url}
-						target="_blank"
-						rel="noopener noreferrer"
-						className="rounded p-1 text-zinc-400 opacity-0 transition-all group-hover:opacity-100 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-					>
-						<ExternalLink className="size-3.5" />
-					</a>
-				)}
-			</div>
-		</article>
 	)
 }

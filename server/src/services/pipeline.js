@@ -7,7 +7,8 @@ import { extractContent } from "../modules/extractor.js"
 import { deduplicate } from "../modules/deduplicator.js"
 import { detectChanges } from "../modules/changeDetector.js"
 import { analyzeContent } from "../modules/aiAnalyzer.js"
-import { scoreInsight } from "../modules/scorer.js"
+import { scoreSignal } from "../modules/scorer.js"
+import { validateSignal } from "../modules/signalValidator.js"
 import { generateReport } from "../modules/reportGenerator.js"
 
 const CONCURRENCY = 3
@@ -62,43 +63,59 @@ export async function runProject(project) {
 
 		const withChanges = detectChanges(extracted, existingDocs)
 
-		const insights = []
+		const signals = []
+		let discardedCount = 0
+
 		for (const row of withChanges) {
 			const analysis = await analyzeContent(row.text, {
 				keyword: project.keyword,
 				competitors: project.competitors || [],
 			})
-			const priority = scoreInsight(
+
+			const validation = validateSignal(analysis)
+			if (!validation.valid) {
+				discardedCount++
+				console.log(
+					`[pipeline] discarded signal: ${validation.reason} — url=${row.url}`
+				)
+				continue
+			}
+
+			const priority = scoreSignal(
 				analysis,
 				project.competitors || [],
 				row.change_type
 			)
-			insights.push({
+
+			signals.push({
 				url: row.url,
-				title: row.title,
-				entity: analysis.entity,
-				category: analysis.category,
-				summary: analysis.summary,
+				title: analysis.title || row.title,
+				agent: analysis.agent,
+				what_changed: analysis.what_changed,
+				impact_on_itm: analysis.impact_on_itm,
+				recommended_action: analysis.recommended_action,
 				change_type: row.change_type,
 				priority,
-				why_it_matters: analysis.why_it_matters,
-				suggested_action: analysis.suggested_action,
 				contentHash: row.hash,
 				runId: runRef.id,
 			})
 		}
 
+		console.log(
+			`[pipeline] ${signals.length} valid signals, ${discardedCount} discarded`
+		)
+
 		const now = new Date().toISOString()
 
-		const insightBatch = db.batch()
-		for (const insight of insights) {
-			const ref = projectRef.collection("insights").doc()
-			insightBatch.set(ref, {
-				...insight,
+		const signalBatch = db.batch()
+		for (const signal of signals) {
+			const ref = projectRef.collection("signals").doc()
+			signalBatch.set(ref, {
+				...signal,
 				createdAt: FieldValue.serverTimestamp(),
 			})
 		}
-		await insightBatch.commit()
+		await signalBatch.commit()
 
 		const docBatch = db.batch()
 		for (const row of extracted) {
@@ -124,7 +141,7 @@ export async function runProject(project) {
 		}
 		await docBatch.commit()
 
-		const report = generateReport(insights, project)
+		const report = generateReport(signals, project, discardedCount)
 
 		const reportRef = await projectRef.collection("reports").add({
 			runId: runRef.id,
@@ -143,6 +160,7 @@ export async function runProject(project) {
 			highPriorityCount: stats.high,
 			mediumPriorityCount: stats.medium,
 			lowPriorityCount: stats.low,
+			discardedCount,
 			duration,
 			reportId: reportRef.id,
 		})
@@ -154,14 +172,14 @@ export async function runProject(project) {
 		})
 
 		console.log(
-			`[pipeline] done report=${reportRef.id} items=${stats.total} duration=${duration}ms`
+			`[pipeline] done report=${reportRef.id} signals=${stats.total} discarded=${discardedCount} duration=${duration}ms`
 		)
 
 		return {
 			reportId: reportRef.id,
 			runId: runRef.id,
 			report,
-			insights: insights.map(i => ({ ...i, createdAt: now })),
+			signals: signals.map(s => ({ ...s, createdAt: now })),
 		}
 	} catch (err) {
 		await runRef.update({

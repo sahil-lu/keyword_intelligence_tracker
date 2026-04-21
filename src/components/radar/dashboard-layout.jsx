@@ -5,7 +5,7 @@ import { useFirebaseAuth } from "@/providers/firebase-auth-provider"
 import { useEffect } from "react"
 import { Sidebar } from "./sidebar"
 import { ReportView } from "./report-view"
-import { FindingsView } from "./findings-view"
+import { SignalsView } from "./signals-view"
 import { RunsView } from "./runs-view"
 import { DocumentsView } from "./documents-view"
 import { Button } from "@/ui/button"
@@ -13,7 +13,7 @@ import { Loader2, Play } from "lucide-react"
 
 const views = {
 	report: ReportView,
-	findings: FindingsView,
+	signals: SignalsView,
 	runs: RunsView,
 	documents: DocumentsView,
 }

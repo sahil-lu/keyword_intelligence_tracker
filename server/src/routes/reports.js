@@ -30,16 +30,16 @@ router.get("/:id/report", async (req, res) => {
 		const doc = snap.docs[0]
 		const data = doc.data()
 
-		let insights = []
+		let signals = []
 		if (data.runId) {
-			const insightsSnap = await db()
+			const signalsSnap = await db()
 				.collection("projects")
 				.doc(projectId)
-				.collection("insights")
+				.collection("signals")
 				.where("runId", "==", data.runId)
 				.limit(100)
 				.get()
-			insights = insightsSnap.docs
+			signals = signalsSnap.docs
 				.map(d => ({ id: d.id, ...d.data() }))
 				.sort((a, b) => {
 					const ta = a.createdAt?._seconds || 0
@@ -54,7 +54,7 @@ router.get("/:id/report", async (req, res) => {
 			runId: data.runId || null,
 			createdAt: data.createdAt,
 			report: data.report,
-			insights,
+			signals,
 		})
 	} catch (err) {
 		console.error("GET /projects/:id/report", err)

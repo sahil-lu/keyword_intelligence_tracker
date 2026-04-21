@@ -10,14 +10,14 @@ import {
 	History,
 	LogOut,
 	Plus,
-	Search,
+	Zap,
 } from "lucide-react"
 import { useState } from "react"
 import { ProjectFormDialog } from "./project-form-dialog"
 
 const NAV_ITEMS = [
 	{ key: "report", label: "Report", icon: BarChart3 },
-	{ key: "findings", label: "Findings", icon: Search },
+	{ key: "signals", label: "Signals", icon: Zap },
 	{ key: "runs", label: "Runs", icon: History },
 	{ key: "documents", label: "Documents", icon: FolderOpen },
 ]
@@ -41,7 +41,7 @@ export function Sidebar({ user, onSignOut }) {
 					<FileText className="size-3.5 text-white dark:text-zinc-900" />
 				</div>
 				<span className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-					Intel Radar
+					ITM Intel Radar
 				</span>
 			</div>
 
