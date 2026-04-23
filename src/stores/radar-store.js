@@ -122,6 +122,11 @@ export const useRadarStore = create((set, get) => ({
 		}
 	},
 
+	navigateToSignals: (filter = {}) => {
+		set({ signalsFilter: filter, activeView: "signals" })
+		get().fetchSignals(filter)
+	},
+
 	setSignalsFilter: filter => {
 		const current = get().signalsFilter
 		const next = { ...current, ...filter }

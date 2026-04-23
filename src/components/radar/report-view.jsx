@@ -110,23 +110,27 @@ function hostOf(url) {
 	}
 }
 
-function StatChip({ icon: Icon, label, value, accent }) {
+function StatChip({ icon: Icon, label, value, accent, onClick }) {
+	const Comp = onClick ? "button" : "div"
 	return (
-		<div
+		<Comp
+			type={onClick ? "button" : undefined}
+			onClick={onClick}
 			className={cn(
-				"flex items-center gap-2 rounded-lg border px-3 py-2",
+				"flex items-center gap-2 rounded-lg border px-3 py-2 transition-shadow",
+				onClick && "cursor-pointer hover:shadow-md",
 				accent ||
 					"border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
 			)}
 		>
 			<Icon className="size-4 shrink-0 text-zinc-400" />
-			<div>
+			<div className="text-left">
 				<p className="text-lg leading-none font-semibold text-zinc-900 dark:text-zinc-50">
 					{value}
 				</p>
 				<p className="mt-0.5 text-[11px] text-zinc-500">{label}</p>
 			</div>
-		</div>
+		</Comp>
 	)
 }
 
@@ -321,7 +325,7 @@ function AgentBarChart({ agentSummary }) {
 	)
 }
 
-function AgentGrid({ agentSummary }) {
+function AgentGrid({ agentSummary, onAgentClick }) {
 	const agents = (agentSummary || []).filter(a => a.agent !== "other")
 	if (agents.length === 0) return null
 
@@ -335,10 +339,12 @@ function AgentGrid({ agentSummary }) {
 				const pct = total > 0 ? Math.round((high / total) * 100) : 0
 
 				return (
-					<div
+					<button
+						type="button"
 						key={a.agent}
+						onClick={() => onAgentClick?.(a.agent)}
 						className={cn(
-							"flex flex-col rounded-xl border p-3 transition-shadow hover:shadow-md",
+							"flex cursor-pointer flex-col rounded-xl border p-3 text-left transition-shadow hover:shadow-md",
 							config.borderColor,
 							"bg-white dark:bg-zinc-900"
 						)}
@@ -387,7 +393,7 @@ function AgentGrid({ agentSummary }) {
 								{a.top_signal.title}
 							</p>
 						)}
-					</div>
+					</button>
 				)
 			})}
 		</div>
@@ -484,12 +490,19 @@ function SignalCard({ signal }) {
 }
 
 export function ReportView() {
-	const { report, reportLoading, selectedProjectId, fetchReport } =
-		useRadarStore()
+	const {
+		report,
+		reportLoading,
+		selectedProjectId,
+		fetchReport,
+		navigateToSignals,
+	} = useRadarStore()
 
 	useEffect(() => {
 		if (selectedProjectId) fetchReport()
 	}, [selectedProjectId, fetchReport])
+
+	const goToSignals = (filter = {}) => navigateToSignals(filter)
 
 	if (reportLoading) {
 		return (
@@ -518,17 +531,20 @@ export function ReportView() {
 					icon={Globe}
 					label="Total signals"
 					value={stats.total ?? "—"}
+					onClick={() => goToSignals()}
 				/>
 				<StatChip
 					icon={TrendingUp}
 					label="New"
 					value={stats.new ?? "—"}
+					onClick={() => goToSignals({ change_type: "new" })}
 				/>
 				<StatChip
 					icon={AlertTriangle}
 					label="High priority"
 					value={stats.high ?? "—"}
 					accent="border-red-200 bg-red-50/50 dark:border-red-500/20 dark:bg-red-500/5"
+					onClick={() => goToSignals({ priority: "HIGH" })}
 				/>
 				<StatChip
 					icon={Shield}
@@ -568,7 +584,10 @@ export function ReportView() {
 						icon={Target}
 						label="Agent Overview"
 					/>
-					<AgentGrid agentSummary={r.agent_summary} />
+					<AgentGrid
+						agentSummary={r.agent_summary}
+						onAgentClick={agent => goToSignals({ agent })}
+					/>
 				</section>
 			)}
 
