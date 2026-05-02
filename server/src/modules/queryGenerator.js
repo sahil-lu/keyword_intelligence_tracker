@@ -3,22 +3,21 @@ export function generateQueries(project) {
 	const competitors = Array.isArray(project.competitors)
 		? project.competitors
 		: []
+	const competitorDomains = Array.isArray(project.competitorDomains)
+		? project.competitorDomains
+		: []
 
 	if (!keyword) return []
 
 	const queries = [
 		keyword,
-		// Policy agent
 		`${keyword} UGC guidelines`,
 		`${keyword} AICTE policy`,
 		`${keyword} exam changes`,
-		// Jobs agent
 		`${keyword} hiring trends`,
 		`${keyword} job demand`,
-		// Skills agent
 		`${keyword} skill trends`,
 		`${keyword} technology shifts`,
-		// Program agent
 		`${keyword} new courses`,
 		`${keyword} program pricing`,
 	]
@@ -29,6 +28,12 @@ export function generateQueries(project) {
 		queries.push(`${c} ${keyword}`)
 		queries.push(`${c} new launch`)
 		queries.push(`${c} fee structure`)
+	}
+
+	for (const domain of competitorDomains) {
+		const d = String(domain).trim()
+		if (!d) continue
+		queries.push(`site:${d} ${keyword}`)
 	}
 
 	return [...new Set(queries)]

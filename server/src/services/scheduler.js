@@ -1,32 +1,35 @@
 import cron from "node-cron"
 import { getFirestore } from "../db/firebase.js"
 import { runProject } from "./pipeline.js"
+import { sendEmailReport } from "./emailService.js"
 
-/**
- * Schedules periodic runs: daily projects at 09:00 UTC, weekly on Mondays 09:00 UTC.
- */
+function log(stage, data) {
+	const ts = new Date().toISOString()
+	console.log(JSON.stringify({ ts, stage, ...data }))
+}
+
 export function startScheduler() {
 	const db = getFirestore()
 
 	cron.schedule(
-		"0 9 * * *",
+		"0 2 * * *",
 		async () => {
-			console.log("[scheduler] daily tick")
+			log("scheduler:tick", { type: "daily" })
 			await runFrequency(db, "daily")
 		},
-		{ timezone: "UTC" }
+		{ timezone: "Asia/Kolkata" }
 	)
 
 	cron.schedule(
-		"0 9 * * 1",
+		"0 2 * * 1",
 		async () => {
-			console.log("[scheduler] weekly tick")
+			log("scheduler:tick", { type: "weekly" })
 			await runFrequency(db, "weekly")
 		},
-		{ timezone: "UTC" }
+		{ timezone: "Asia/Kolkata" }
 	)
 
-	console.log("[scheduler] started (daily 09:00 UTC, weekly Mon 09:00 UTC)")
+	log("scheduler:started", { daily: "08:00 IST", weekly: "Mon 08:00 IST" })
 }
 
 async function runFrequency(db, frequency) {
@@ -34,15 +37,25 @@ async function runFrequency(db, frequency) {
 		.collection("projects")
 		.where("frequency", "==", frequency)
 		.get()
+
+	log("scheduler:projects", { frequency, count: snap.docs.length })
+
 	for (const doc of snap.docs) {
 		const project = { id: doc.id, ...doc.data() }
 		try {
-			await runProject(project)
+			const result = await runProject(project)
+
+			if (project.emailEnabled && project.emailRecipients?.length > 0) {
+				await sendEmailReport(
+					project,
+					result.report,
+					project.emailRecipients
+				)
+			}
+
+			log("scheduler:run:ok", { projectId: doc.id })
 		} catch (err) {
-			console.error(
-				`[scheduler] run failed project=${doc.id}`,
-				err.message
-			)
+			log("scheduler:run:fail", { projectId: doc.id, error: err.message })
 		}
 	}
 }

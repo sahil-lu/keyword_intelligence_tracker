@@ -8,6 +8,8 @@ import { ReportView } from "./report-view"
 import { SignalsView } from "./signals-view"
 import { RunsView } from "./runs-view"
 import { DocumentsView } from "./documents-view"
+import { SettingsView } from "./settings-view"
+import { CompetitorsView } from "./competitors-view"
 import { Button } from "@/ui/button"
 import { Loader2, Play } from "lucide-react"
 
@@ -16,6 +18,8 @@ const views = {
 	signals: SignalsView,
 	runs: RunsView,
 	documents: DocumentsView,
+	settings: SettingsView,
+	competitors: CompetitorsView,
 }
 
 export function DashboardLayout() {

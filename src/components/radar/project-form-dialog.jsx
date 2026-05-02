@@ -20,6 +20,7 @@ export function ProjectFormDialog({ onClose }) {
 	const [name, setName] = useState("")
 	const [keyword, setKeyword] = useState("")
 	const [competitors, setCompetitors] = useState("")
+	const [competitorDomains, setCompetitorDomains] = useState("")
 	const [frequency, setFrequency] = useState("daily")
 	const [busy, setBusy] = useState(false)
 
@@ -35,10 +36,20 @@ export function ProjectFormDialog({ onClose }) {
 				.split(",")
 				.map(s => s.trim())
 				.filter(Boolean)
+			const domains = competitorDomains
+				.split(",")
+				.map(s =>
+					s
+						.trim()
+						.replace(/^https?:\/\//, "")
+						.replace(/\/.*$/, "")
+				)
+				.filter(Boolean)
 			await createProject({
 				name: name.trim(),
 				keyword: keyword.trim(),
 				competitors: comp,
+				competitorDomains: domains,
 				frequency,
 			})
 			toast.success("Project created")
@@ -76,7 +87,7 @@ export function ProjectFormDialog({ onClose }) {
 							id="pf-name"
 							value={name}
 							onChange={e => setName(e.target.value)}
-							placeholder="e.g. Student lending Q2"
+							placeholder="e.g. MBA Intelligence Q2"
 						/>
 					</div>
 					<div className="space-y-1.5">
@@ -85,7 +96,7 @@ export function ProjectFormDialog({ onClose }) {
 							id="pf-kw"
 							value={keyword}
 							onChange={e => setKeyword(e.target.value)}
-							placeholder="e.g. student loan refinance"
+							placeholder="e.g. MBA programs India"
 						/>
 					</div>
 					<div className="space-y-1.5">
@@ -96,8 +107,23 @@ export function ProjectFormDialog({ onClose }) {
 							id="pf-comp"
 							value={competitors}
 							onChange={e => setCompetitors(e.target.value)}
-							placeholder="SoFi, Earnest"
+							placeholder="Amity, Symbiosis, Manipal"
 						/>
+					</div>
+					<div className="space-y-1.5">
+						<Label htmlFor="pf-domains">
+							Competitor Domains (comma-separated)
+						</Label>
+						<Input
+							id="pf-domains"
+							value={competitorDomains}
+							onChange={e => setCompetitorDomains(e.target.value)}
+							placeholder="amity.edu, symbiosis.ac.in"
+						/>
+						<p className="text-[11px] text-zinc-400">
+							These domains will be directly crawled on every
+							scan.
+						</p>
 					</div>
 					<div className="space-y-1.5">
 						<Label>Frequency</Label>

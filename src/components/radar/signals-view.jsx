@@ -4,8 +4,8 @@ import { useRadarStore } from "@/stores/radar-store"
 import { Badge } from "@/ui/badge"
 import { Skeleton } from "@/ui/skeleton"
 import { cn } from "@/lib/utils"
-import { ExternalLink, Search } from "lucide-react"
-import { useEffect } from "react"
+import { ExternalLink, EyeOff, Search } from "lucide-react"
+import { useEffect, useMemo } from "react"
 
 const PRIORITIES = ["ALL", "HIGH", "MEDIUM", "LOW"]
 const CHANGE_TYPES = ["ALL", "new", "updated", "existing"]
@@ -53,6 +53,12 @@ function hostOf(url) {
 	}
 }
 
+function confidenceColor(score) {
+	if (score >= 0.7) return "bg-emerald-500"
+	if (score >= 0.4) return "bg-amber-500"
+	return "bg-red-400"
+}
+
 function FilterChip({ label, active, onClick }) {
 	return (
 		<button
@@ -91,6 +97,8 @@ export function SignalsView() {
 		setSignalsFilter,
 		selectedProjectId,
 		fetchSignals,
+		hideLow,
+		toggleHideLow,
 	} = useRadarStore()
 
 	useEffect(() => {
@@ -100,6 +108,13 @@ export function SignalsView() {
 	const activePriority = signalsFilter.priority || "ALL"
 	const activeChangeType = signalsFilter.change_type || "ALL"
 	const activeAgent = signalsFilter.agent || "ALL"
+
+	const filtered = useMemo(() => {
+		if (!hideLow || activePriority === "LOW") return signals
+		return signals.filter(s => s.priority !== "LOW")
+	}, [signals, hideLow, activePriority])
+
+	const lowCount = signals.filter(s => s.priority === "LOW").length
 
 	return (
 		<div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -154,12 +169,27 @@ export function SignalsView() {
 							}
 						/>
 					))}
+					<div className="ml-auto">
+						<button
+							type="button"
+							onClick={toggleHideLow}
+							className={cn(
+								"flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+								hideLow
+									? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+									: "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
+							)}
+						>
+							<EyeOff className="size-3" />
+							{hideLow ? `Hiding ${lowCount} low` : "Show all"}
+						</button>
+					</div>
 				</div>
 			</div>
 
 			{signalsLoading ? (
 				<SignalsTableSkeleton />
-			) : signals.length === 0 ? (
+			) : filtered.length === 0 ? (
 				<div className="flex flex-col items-center justify-center py-16 text-center">
 					<div className="mb-3 flex size-12 items-center justify-center rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700">
 						<Search className="size-5 text-zinc-400" />
@@ -182,72 +212,99 @@ export function SignalsView() {
 								<th className="px-4 py-2.5">Impact</th>
 								<th className="px-4 py-2.5">Action</th>
 								<th className="px-4 py-2.5">Priority</th>
+								<th className="w-16 px-4 py-2.5">Conf.</th>
 								<th className="px-4 py-2.5">Source</th>
 							</tr>
 						</thead>
 						<tbody>
-							{signals.map((s, i) => (
-								<tr
-									key={s.id || i}
-									className="border-b border-zinc-50 transition-colors last:border-0 hover:bg-zinc-50/50 dark:border-zinc-800/50 dark:hover:bg-zinc-800/30"
-								>
-									<td className="max-w-[180px] px-4 py-3">
-										<p className="truncate font-medium text-zinc-900 dark:text-zinc-50">
-											{s.title}
-										</p>
-									</td>
-									<td className="px-4 py-3">
-										<span
-											className={cn(
-												"inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase",
-												AGENT_COLORS[s.agent] ||
-													AGENT_COLORS.other
-											)}
-										>
-											{s.agent}
-										</span>
-									</td>
-									<td className="max-w-[200px] px-4 py-3">
-										<p className="line-clamp-2 text-xs text-zinc-600 dark:text-zinc-300">
-											{s.what_changed}
-										</p>
-									</td>
-									<td className="max-w-[180px] px-4 py-3">
-										<p className="line-clamp-2 text-xs text-amber-700 dark:text-amber-300">
-											{s.impact_on_itm}
-										</p>
-									</td>
-									<td className="max-w-[180px] px-4 py-3">
-										<p className="line-clamp-2 text-xs text-emerald-700 dark:text-emerald-300">
-											{s.recommended_action}
-										</p>
-									</td>
-									<td className="px-4 py-3">
-										<Badge
-											variant="outline"
-											className={cn(
-												"text-[10px] uppercase",
-												priorityColor(s.priority)
-											)}
-										>
-											{s.priority}
-										</Badge>
-									</td>
-									<td className="px-4 py-3">
-										{s.url && (
-											<a
-												href={s.url}
-												target="_blank"
-												rel="noopener noreferrer"
-												className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+							{filtered.map((s, i) => {
+								const conf = s.confidence_score || 0
+								return (
+									<tr
+										key={s.id || i}
+										className="border-b border-zinc-50 transition-colors last:border-0 hover:bg-zinc-50/50 dark:border-zinc-800/50 dark:hover:bg-zinc-800/30"
+									>
+										<td className="max-w-[180px] px-4 py-3">
+											<p className="truncate font-medium text-zinc-900 dark:text-zinc-50">
+												{s.title}
+											</p>
+										</td>
+										<td className="px-4 py-3">
+											<span
+												className={cn(
+													"inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+													AGENT_COLORS[s.agent] ||
+														AGENT_COLORS.other
+												)}
 											>
-												{hostOf(s.url)}
-												<ExternalLink className="size-3" />
-											</a>
-										)}
-									</td>
-								</tr>
-							))}
+												{s.agent}
+											</span>
+										</td>
+										<td className="max-w-[200px] px-4 py-3">
+											<p className="line-clamp-2 text-xs text-zinc-600 dark:text-zinc-300">
+												{s.what_changed}
+											</p>
+										</td>
+										<td className="max-w-[180px] px-4 py-3">
+											<p className="line-clamp-2 text-xs text-amber-700 dark:text-amber-300">
+												{s.impact_on_itm}
+											</p>
+										</td>
+										<td className="max-w-[180px] px-4 py-3">
+											<p className="line-clamp-2 text-xs text-emerald-700 dark:text-emerald-300">
+												{s.recommended_action}
+											</p>
+										</td>
+										<td className="px-4 py-3">
+											<Badge
+												variant="outline"
+												className={cn(
+													"text-[10px] uppercase",
+													priorityColor(s.priority)
+												)}
+											>
+												{s.priority}
+											</Badge>
+										</td>
+										<td className="px-4 py-3">
+											<div
+												className="flex items-center gap-1"
+												title={`${Math.round(conf * 100)}%`}
+											>
+												<div className="h-1.5 w-10 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+													<div
+														className={cn(
+															"h-full rounded-full",
+															confidenceColor(
+																conf
+															)
+														)}
+														style={{
+															width: `${Math.round(conf * 100)}%`,
+														}}
+													/>
+												</div>
+												<span className="text-[9px] text-zinc-400">
+													{Math.round(conf * 100)}%
+												</span>
+											</div>
+										</td>
+										<td className="px-4 py-3">
+											{s.url && (
+												<a
+													href={s.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+												>
+													{hostOf(s.url)}
+													<ExternalLink className="size-3" />
+												</a>
+											)}
+										</td>
+									</tr>
+								)
+							})}
 						</tbody>
 					</table>
 				</div>

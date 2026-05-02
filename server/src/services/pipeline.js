@@ -2,13 +2,16 @@ import { createHash } from "node:crypto"
 import { FieldValue } from "firebase-admin/firestore"
 import { getFirestore } from "../db/firebase.js"
 import { generateQueries } from "../modules/queryGenerator.js"
-import { fetchResults } from "../modules/fetcher.js"
+import { fetchResults, fetchDirectUrls } from "../modules/fetcher.js"
 import { extractContent } from "../modules/extractor.js"
 import { deduplicate } from "../modules/deduplicator.js"
 import { detectChanges } from "../modules/changeDetector.js"
 import { analyzeContent } from "../modules/aiAnalyzer.js"
 import { scoreSignal } from "../modules/scorer.js"
-import { validateSignal } from "../modules/signalValidator.js"
+import {
+	validateSignal,
+	deduplicateSignals,
+} from "../modules/signalValidator.js"
 import { generateReport } from "../modules/reportGenerator.js"
 
 const CONCURRENCY = 3
@@ -24,12 +27,42 @@ function urlToDocId(url) {
 	return createHash("md5").update(url).digest("hex")
 }
 
+function log(stage, data) {
+	const ts = new Date().toISOString()
+	console.log(JSON.stringify({ ts, stage, ...data }))
+}
+
+async function getPreviousTrend(projectRef) {
+	try {
+		const snap = await projectRef
+			.collection("trends")
+			.orderBy("createdAt", "desc")
+			.limit(1)
+			.get()
+		if (snap.empty) return null
+		return snap.docs[0].data()
+	} catch {
+		return null
+	}
+}
+
 export async function runProject(project) {
 	if (!project?.id) throw new Error("runProject requires project.id")
 
 	const db = getFirestore()
 	const projectRef = db.collection("projects").doc(project.id)
 	const startTime = Date.now()
+	const pipelineLog = {
+		fetchErrors: 0,
+		extractErrors: 0,
+		aiErrors: 0,
+		tavilyResults: 0,
+		exaResults: 0,
+		customSourcesCount: 0,
+		competitorUrlsCount: 0,
+		firecrawlOk: 0,
+		firecrawlFail: 0,
+	}
 
 	const runRef = await projectRef.collection("runs").add({
 		status: "running",
@@ -37,22 +70,91 @@ export async function runProject(project) {
 		createdAt: FieldValue.serverTimestamp(),
 	})
 
-	console.log(
-		`[pipeline] start project=${project.id} keyword=${project.keyword} run=${runRef.id}`
-	)
+	log("pipeline:start", {
+		projectId: project.id,
+		keyword: project.keyword,
+		runId: runRef.id,
+	})
 
 	try {
 		const queries = generateQueries(project)
-		console.log(`[pipeline] ${queries.length} queries`)
+		log("pipeline:queries", { count: queries.length })
 
-		let fetched = await fetchResults(queries)
+		let fetched
+		try {
+			fetched = await fetchResults(queries)
+			pipelineLog.tavilyResults = fetched.filter(
+				f => f.source_type === "search"
+			).length
+		} catch (err) {
+			pipelineLog.fetchErrors++
+			log("pipeline:fetch:error", { error: err.message })
+			fetched = []
+		}
+
+		const customSources = Array.isArray(project.customSources)
+			? project.customSources
+			: []
+		if (customSources.length > 0) {
+			const customItems = await fetchDirectUrls(customSources)
+			const tagged = customItems.map(c => ({
+				...c,
+				source_type: "custom",
+			}))
+			fetched.push(...tagged)
+			pipelineLog.customSourcesCount = tagged.length
+			log("pipeline:custom-sources", { count: tagged.length })
+		}
+
+		const competitorDomains = Array.isArray(project.competitorDomains)
+			? project.competitorDomains
+			: []
+		const competitors = Array.isArray(project.competitors)
+			? project.competitors
+			: []
+		if (competitorDomains.length > 0) {
+			const domainItems = await fetchDirectUrls(competitorDomains)
+			const tagged = domainItems.map(c => ({
+				...c,
+				source_type: "competitor",
+			}))
+			fetched.push(...tagged)
+			pipelineLog.competitorUrlsCount = tagged.length
+			log("pipeline:competitor-domains", { count: tagged.length })
+		}
+
 		fetched = deduplicate(fetched)
-		console.log(`[pipeline] ${fetched.length} unique URLs`)
+		log("pipeline:urls", { unique: fetched.length })
 
 		const extracted = await mapPool(fetched, CONCURRENCY, async item => {
-			const { url, text } = await extractContent(item.url)
-			return { url, title: item.title, text, hash: contentHash(text) }
+			try {
+				const { url, text } = await extractContent(item.url)
+				return {
+					url,
+					title: item.title,
+					text,
+					hash: contentHash(text),
+					source_type: item.source_type || "search",
+					entity: item.entity || null,
+				}
+			} catch (err) {
+				pipelineLog.extractErrors++
+				log("pipeline:extract:error", {
+					url: item.url,
+					error: err.message,
+				})
+				return {
+					url: item.url,
+					title: item.title,
+					text: "",
+					hash: "",
+					source_type: item.source_type || "search",
+					entity: item.entity || null,
+				}
+			}
 		})
+
+		const validExtracted = extracted.filter(e => e.text.length > 50)
 
 		const docsSnap = await projectRef.collection("documents").get()
 		const existingDocs = {}
@@ -61,31 +163,46 @@ export async function runProject(project) {
 			existingDocs[data.url] = data
 		})
 
-		const withChanges = detectChanges(extracted, existingDocs)
+		const withChanges = detectChanges(validExtracted, existingDocs)
 
-		const signals = []
+		let signals = []
 		let discardedCount = 0
+		const discardReasons = {}
 
 		for (const row of withChanges) {
-			const analysis = await analyzeContent(row.text, {
-				keyword: project.keyword,
-				competitors: project.competitors || [],
-			})
+			let analysis
+			try {
+				analysis = await analyzeContent(row.text, {
+					keyword: project.keyword,
+					competitors: competitors,
+				})
+			} catch (err) {
+				pipelineLog.aiErrors++
+				log("pipeline:ai:error", { url: row.url, error: err.message })
+				continue
+			}
 
 			const validation = validateSignal(analysis)
 			if (!validation.valid) {
 				discardedCount++
-				console.log(
-					`[pipeline] discarded signal: ${validation.reason} — url=${row.url}`
-				)
+				const bucket = validation.reason.split(":")[0] || "unknown"
+				discardReasons[bucket] = (discardReasons[bucket] || 0) + 1
+				log("pipeline:discard", {
+					reason: validation.reason,
+					url: row.url,
+				})
 				continue
 			}
 
-			const priority = scoreSignal(
+			const { priority, priority_score } = scoreSignal(
 				analysis,
-				project.competitors || [],
+				competitors,
 				row.change_type
 			)
+
+			const entity =
+				row.entity ||
+				detectEntity(row.url, competitors, competitorDomains)
 
 			signals.push({
 				url: row.url,
@@ -96,14 +213,28 @@ export async function runProject(project) {
 				recommended_action: analysis.recommended_action,
 				change_type: row.change_type,
 				priority,
+				priority_score,
+				confidence_score: analysis.confidence_score,
+				source_type: row.source_type || "search",
+				entity,
 				contentHash: row.hash,
 				runId: runRef.id,
 			})
 		}
 
-		console.log(
-			`[pipeline] ${signals.length} valid signals, ${discardedCount} discarded`
-		)
+		const preDedup = signals.length
+		signals = deduplicateSignals(signals)
+		const dedupRemoved = preDedup - signals.length
+		if (dedupRemoved > 0) {
+			discardedCount += dedupRemoved
+			log("pipeline:dedup", { removed: dedupRemoved })
+		}
+
+		log("pipeline:signals", {
+			valid: signals.length,
+			discarded: discardedCount,
+			discardReasons,
+		})
 
 		const now = new Date().toISOString()
 
@@ -126,12 +257,14 @@ export async function runProject(project) {
 					lastSeenAt: FieldValue.serverTimestamp(),
 					contentHash: row.hash,
 					title: row.title,
+					source_type: row.source_type || "search",
 					seenInRuns: FieldValue.arrayUnion(runRef.id),
 				})
 			} else {
 				docBatch.set(docRef, {
 					url: row.url,
 					title: row.title,
+					source_type: row.source_type || "search",
 					firstSeenAt: FieldValue.serverTimestamp(),
 					lastSeenAt: FieldValue.serverTimestamp(),
 					contentHash: row.hash,
@@ -141,12 +274,38 @@ export async function runProject(project) {
 		}
 		await docBatch.commit()
 
-		const report = generateReport(signals, project, discardedCount)
+		const previousTrend = await getPreviousTrend(projectRef)
+
+		const report = generateReport(
+			signals,
+			project,
+			discardedCount,
+			previousTrend
+		)
 
 		const reportRef = await projectRef.collection("reports").add({
 			runId: runRef.id,
 			createdAt: FieldValue.serverTimestamp(),
 			report,
+		})
+
+		const agentDist = {}
+		const priorityDist = { HIGH: 0, MEDIUM: 0, LOW: 0 }
+		for (const s of signals) {
+			agentDist[s.agent] = (agentDist[s.agent] || 0) + 1
+			priorityDist[s.priority] = (priorityDist[s.priority] || 0) + 1
+		}
+
+		await projectRef.collection("trends").add({
+			runId: runRef.id,
+			createdAt: FieldValue.serverTimestamp(),
+			total: signals.length,
+			high: priorityDist.HIGH,
+			medium: priorityDist.MEDIUM,
+			low: priorityDist.LOW,
+			discarded: discardedCount,
+			agents: agentDist,
+			avg_confidence: report.stats.avg_confidence,
 		})
 
 		const duration = Date.now() - startTime
@@ -161,6 +320,13 @@ export async function runProject(project) {
 			mediumPriorityCount: stats.medium,
 			lowPriorityCount: stats.low,
 			discardedCount,
+			dedupRemoved,
+			avgConfidence: stats.avg_confidence,
+			fetchErrors: pipelineLog.fetchErrors,
+			extractErrors: pipelineLog.extractErrors,
+			aiErrors: pipelineLog.aiErrors,
+			customSourcesCount: pipelineLog.customSourcesCount,
+			competitorUrlsCount: pipelineLog.competitorUrlsCount,
 			duration,
 			reportId: reportRef.id,
 		})
@@ -171,9 +337,15 @@ export async function runProject(project) {
 			lastReportId: reportRef.id,
 		})
 
-		console.log(
-			`[pipeline] done report=${reportRef.id} signals=${stats.total} discarded=${discardedCount} duration=${duration}ms`
-		)
+		log("pipeline:done", {
+			reportId: reportRef.id,
+			signals: stats.total,
+			discarded: discardedCount,
+			duration,
+			avgConfidence: stats.avg_confidence,
+			customSources: pipelineLog.customSourcesCount,
+			competitorUrls: pipelineLog.competitorUrlsCount,
+		})
 
 		return {
 			reportId: reportRef.id,
@@ -182,14 +354,34 @@ export async function runProject(project) {
 			signals: signals.map(s => ({ ...s, createdAt: now })),
 		}
 	} catch (err) {
+		log("pipeline:failed", {
+			error: err.message,
+			duration: Date.now() - startTime,
+		})
 		await runRef.update({
 			status: "failed",
 			completedAt: FieldValue.serverTimestamp(),
 			error: err.message,
 			duration: Date.now() - startTime,
+			fetchErrors: pipelineLog.fetchErrors,
+			extractErrors: pipelineLog.extractErrors,
+			aiErrors: pipelineLog.aiErrors,
 		})
 		throw err
 	}
+}
+
+function detectEntity(url, competitors, competitorDomains) {
+	const lower = url.toLowerCase()
+	for (let i = 0; i < competitorDomains.length; i++) {
+		if (lower.includes(competitorDomains[i]?.toLowerCase())) {
+			return competitors[i] || competitorDomains[i]
+		}
+	}
+	for (const c of competitors) {
+		if (lower.includes(c.toLowerCase().replace(/\s+/g, ""))) return c
+	}
+	return null
 }
 
 async function mapPool(items, concurrency, fn) {

@@ -15,12 +15,16 @@ export const useRadarStore = create((set, get) => ({
 	signals: [],
 	signalsLoading: false,
 	signalsFilter: {},
+	hideLow: true,
 
 	runs: [],
 	runsLoading: false,
 
 	documents: [],
 	documentsLoading: false,
+
+	trends: [],
+	trendsLoading: false,
 
 	scanning: false,
 
@@ -32,6 +36,7 @@ export const useRadarStore = create((set, get) => ({
 		if (view === "signals") get().fetchSignals()
 		if (view === "runs") get().fetchRuns()
 		if (view === "documents") get().fetchDocuments()
+		if (view === "competitors") get().fetchSignals({ agent: "competitor" })
 	},
 
 	fetchProjects: async () => {
@@ -57,12 +62,15 @@ export const useRadarStore = create((set, get) => ({
 			signals: [],
 			runs: [],
 			documents: [],
+			trends: [],
 		})
 		const { activeView } = get()
 		if (activeView === "report") get().fetchReport()
 		else if (activeView === "signals") get().fetchSignals()
 		else if (activeView === "runs") get().fetchRuns()
 		else if (activeView === "documents") get().fetchDocuments()
+		else if (activeView === "competitors")
+			get().fetchSignals({ agent: "competitor" })
 	},
 
 	createProject: async data => {
@@ -94,8 +102,11 @@ export const useRadarStore = create((set, get) => ({
 		if (!selectedProjectId) return
 		set({ reportLoading: true })
 		try {
-			const data = await radarApi.getReport(selectedProjectId)
-			set({ report: data, reportLoading: false })
+			const [data, trends] = await Promise.all([
+				radarApi.getReport(selectedProjectId),
+				radarApi.getTrends(selectedProjectId).catch(() => []),
+			])
+			set({ report: data, trends, reportLoading: false })
 		} catch (e) {
 			if (
 				e.message?.includes("No reports") ||
@@ -137,6 +148,10 @@ export const useRadarStore = create((set, get) => ({
 		get().fetchSignals(next)
 	},
 
+	toggleHideLow: () => {
+		set(state => ({ hideLow: !state.hideLow }))
+	},
+
 	fetchRuns: async () => {
 		const { selectedProjectId } = get()
 		if (!selectedProjectId) return
@@ -158,6 +173,45 @@ export const useRadarStore = create((set, get) => ({
 			set({ documents: data, documentsLoading: false })
 		} catch {
 			set({ documents: [], documentsLoading: false })
+		}
+	},
+
+	updateSources: async sources => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			await radarApi.updateSources(selectedProjectId, sources)
+			await get().fetchProjects()
+			toast.success("Custom sources updated")
+		} catch (e) {
+			toast.error(e.message)
+			throw e
+		}
+	},
+
+	updateCompetitors: async data => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			await radarApi.updateCompetitors(selectedProjectId, data)
+			await get().fetchProjects()
+			toast.success("Competitors updated")
+		} catch (e) {
+			toast.error(e.message)
+			throw e
+		}
+	},
+
+	updateEmailSettings: async data => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			await radarApi.updateEmailSettings(selectedProjectId, data)
+			await get().fetchProjects()
+			toast.success("Email settings updated")
+		} catch (e) {
+			toast.error(e.message)
+			throw e
 		}
 	},
 }))

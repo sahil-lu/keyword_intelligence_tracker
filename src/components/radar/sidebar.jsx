@@ -10,6 +10,8 @@ import {
 	History,
 	LogOut,
 	Plus,
+	Settings,
+	Users,
 	Zap,
 } from "lucide-react"
 import { useState } from "react"
@@ -18,8 +20,10 @@ import { ProjectFormDialog } from "./project-form-dialog"
 const NAV_ITEMS = [
 	{ key: "report", label: "Report", icon: BarChart3 },
 	{ key: "signals", label: "Signals", icon: Zap },
+	{ key: "competitors", label: "Competitors", icon: Users },
 	{ key: "runs", label: "Runs", icon: History },
 	{ key: "documents", label: "Documents", icon: FolderOpen },
+	{ key: "settings", label: "Settings", icon: Settings },
 ]
 
 export function Sidebar({ user, onSignOut }) {

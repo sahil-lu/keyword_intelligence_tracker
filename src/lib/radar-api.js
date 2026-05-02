@@ -32,6 +32,11 @@ export const radarApi = {
 			method: "POST",
 			body: JSON.stringify(data),
 		}),
+	updateProject: (id, data) =>
+		request(`/projects/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(data),
+		}),
 	runScan: id => request(`/projects/${id}/run`, { method: "POST" }),
 
 	getReport: id => request(`/projects/${id}/report`),
@@ -47,4 +52,24 @@ export const radarApi = {
 
 	getRuns: id => request(`/projects/${id}/runs`),
 	getDocuments: id => request(`/projects/${id}/documents`),
+	getTrends: (id, limit = 20) =>
+		request(`/projects/${id}/trends?limit=${limit}`),
+
+	updateSources: (id, sources) =>
+		request(`/projects/${id}/sources`, {
+			method: "PUT",
+			body: JSON.stringify({ sources }),
+		}),
+
+	updateCompetitors: (id, data) =>
+		request(`/projects/${id}/competitors`, {
+			method: "PUT",
+			body: JSON.stringify(data),
+		}),
+
+	updateEmailSettings: (id, data) =>
+		request(`/projects/${id}/email-settings`, {
+			method: "PUT",
+			body: JSON.stringify(data),
+		}),
 }

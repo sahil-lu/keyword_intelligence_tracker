@@ -3,10 +3,57 @@ import * as cheerio from "cheerio"
 
 const MAX_CHARS = 12_000
 
-/**
- * Fetches HTML and pulls main paragraph text (MVP: no JS rendering).
- */
+function log(stage, data) {
+	const ts = new Date().toISOString()
+	console.log(JSON.stringify({ ts, stage, ...data }))
+}
+
 export async function extractContent(url) {
+	const firecrawlKey = process.env.FIRECRAWL_API_KEY
+
+	if (firecrawlKey) {
+		try {
+			const result = await firecrawlExtract(url, firecrawlKey)
+			if (result.text && result.text.length > 50) {
+				log("extractor:firecrawl:ok", {
+					url,
+					chars: result.text.length,
+				})
+				return result
+			}
+		} catch (err) {
+			log("extractor:firecrawl:fail", { url, error: err.message })
+		}
+	}
+
+	return cheerioExtract(url)
+}
+
+async function firecrawlExtract(url, apiKey) {
+	const { data } = await axios.post(
+		"https://api.firecrawl.dev/v1/scrape",
+		{
+			url,
+			formats: ["markdown"],
+		},
+		{
+			timeout: 30_000,
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${apiKey}`,
+			},
+		}
+	)
+
+	let text = data?.data?.markdown || data?.data?.content || ""
+	if (text.length > MAX_CHARS) {
+		text = `${text.slice(0, MAX_CHARS)}…`
+	}
+
+	return { url, text: text || "(no extractable text)" }
+}
+
+async function cheerioExtract(url) {
 	try {
 		const { data: html } = await axios.get(url, {
 			timeout: 15_000,
@@ -38,7 +85,7 @@ export async function extractContent(url) {
 
 		return { url, text: text || "(no extractable text)" }
 	} catch (err) {
-		console.warn(`extractContent failed for ${url}:`, err.message)
+		log("extractor:cheerio:fail", { url, error: err.message })
 		return { url, text: "" }
 	}
 }
