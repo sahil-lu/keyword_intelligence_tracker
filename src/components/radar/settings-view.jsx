@@ -6,16 +6,27 @@ import { Input } from "@/ui/input"
 import { Label } from "@/ui/label"
 import { cn } from "@/lib/utils"
 import {
+	FileUp,
 	Globe,
 	Link,
+	Loader2,
 	Mail,
+	Brain,
 	Plus,
 	Save,
 	Shield,
+	Tag,
 	Trash2,
 	Users,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+
+const MODEL_OPTIONS = [
+	{ key: "DEFAULT", label: "Default", locked: true },
+	{ key: "OPENAI_DEEP_RESEARCH", label: "OpenAI Deep Research" },
+	{ key: "GEMINI_DEEP_RESEARCH_MAX", label: "Gemini Deep Research Max" },
+	{ key: "PERPLEXITY", label: "Perplexity" },
+]
 
 function SectionHeader({ icon: Icon, label, description }) {
 	return (
@@ -92,6 +103,221 @@ function UrlListEditor({ urls, onChange, placeholder }) {
 							<button
 								type="button"
 								onClick={() => removeUrl(i)}
+								className="shrink-0 rounded p-0.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+							>
+								<Trash2 className="size-3" />
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+		</div>
+	)
+}
+
+function KeywordEditor({ keywords, onChange }) {
+	const [input, setInput] = useState("")
+
+	const addKeyword = () => {
+		const val = input.trim()
+		if (val && !keywords.includes(val)) {
+			onChange([...keywords, val])
+		}
+		setInput("")
+	}
+
+	return (
+		<div className="space-y-2">
+			<div className="flex gap-2">
+				<Input
+					value={input}
+					onChange={e => setInput(e.target.value)}
+					placeholder="e.g. online MBA"
+					onKeyDown={e =>
+						e.key === "Enter" && (e.preventDefault(), addKeyword())
+					}
+					className="flex-1"
+				/>
+				<Button
+					type="button"
+					size="sm"
+					variant="outline"
+					onClick={addKeyword}
+					className="gap-1"
+				>
+					<Plus className="size-3" />
+					Add
+				</Button>
+			</div>
+			{keywords.length > 0 && (
+				<div className="flex flex-wrap gap-1.5">
+					{keywords.map((keyword, i) => (
+						<span
+							key={keyword}
+							className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+						>
+							<Tag className="size-2.5 text-zinc-400" />
+							{keyword}
+							<button
+								type="button"
+								onClick={() =>
+									onChange(keywords.filter((_, j) => j !== i))
+								}
+								className="text-zinc-400 hover:text-red-500"
+							>
+								<Trash2 className="size-2.5" />
+							</button>
+						</span>
+					))}
+				</div>
+			)}
+		</div>
+	)
+}
+
+function ModelSelector({ selectedModels, onChange }) {
+	const toggleModel = model => {
+		if (model === "DEFAULT") return
+		if (selectedModels.includes(model)) {
+			onChange(selectedModels.filter(item => item !== model))
+		} else {
+			onChange([...selectedModels, model])
+		}
+	}
+
+	return (
+		<div className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/70">
+			{MODEL_OPTIONS.map(model => (
+				<label
+					key={model.key}
+					className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200"
+				>
+					<input
+						type="checkbox"
+						checked={selectedModels.includes(model.key)}
+						disabled={model.locked}
+						onChange={() => toggleModel(model.key)}
+						className="size-4 rounded border-zinc-300"
+					/>
+					<span>{model.label}</span>
+					{model.locked && (
+						<span className="text-[10px] text-zinc-400">
+							always on
+						</span>
+					)}
+				</label>
+			))}
+		</div>
+	)
+}
+
+function formatFileSize(bytes) {
+	if (bytes < 1024) return `${bytes} B`
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function DocumentUploader({ uploads, uploadsLoading, onUpload, onDelete }) {
+	const inputRef = useRef(null)
+	const [uploading, setUploading] = useState(false)
+	const [dragOver, setDragOver] = useState(false)
+
+	const handleFiles = useCallback(
+		async files => {
+			if (!files?.length) return
+			setUploading(true)
+			try {
+				for (const file of files) {
+					await onUpload(file)
+				}
+			} finally {
+				setUploading(false)
+				if (inputRef.current) inputRef.current.value = ""
+			}
+		},
+		[onUpload]
+	)
+
+	const onDrop = useCallback(
+		e => {
+			e.preventDefault()
+			setDragOver(false)
+			handleFiles(e.dataTransfer.files)
+		},
+		[handleFiles]
+	)
+
+	return (
+		<div className="space-y-3">
+			<div
+				onDragOver={e => {
+					e.preventDefault()
+					setDragOver(true)
+				}}
+				onDragLeave={() => setDragOver(false)}
+				onDrop={onDrop}
+				className={cn(
+					"flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors",
+					dragOver
+						? "border-zinc-400 bg-zinc-100 dark:border-zinc-500 dark:bg-zinc-800"
+						: "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/50"
+				)}
+			>
+				{uploading ? (
+					<Loader2 className="size-5 animate-spin text-zinc-400" />
+				) : (
+					<FileUp className="size-5 text-zinc-400" />
+				)}
+				<p className="text-xs text-zinc-500">
+					{uploading
+						? "Uploading…"
+						: "Drag & drop PDFs here, or click to browse"}
+				</p>
+				<Button
+					type="button"
+					size="sm"
+					variant="outline"
+					disabled={uploading}
+					onClick={() => inputRef.current?.click()}
+					className="gap-1.5"
+				>
+					<Plus className="size-3" />
+					Choose File
+				</Button>
+				<input
+					ref={inputRef}
+					type="file"
+					accept=".pdf,.txt,.md,.csv"
+					multiple
+					className="hidden"
+					onChange={e => handleFiles(e.target.files)}
+				/>
+			</div>
+
+			{uploadsLoading && (
+				<div className="flex items-center gap-2 py-2 text-xs text-zinc-400">
+					<Loader2 className="size-3 animate-spin" />
+					Loading documents…
+				</div>
+			)}
+
+			{uploads.length > 0 && (
+				<ul className="space-y-1">
+					{uploads.map(doc => (
+						<li
+							key={doc.id}
+							className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900"
+						>
+							<FileUp className="size-3 shrink-0 text-zinc-400" />
+							<span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
+								{doc.filename}
+							</span>
+							<span className="shrink-0 text-[10px] text-zinc-400">
+								{formatFileSize(doc.fileSize)}
+							</span>
+							<button
+								type="button"
+								onClick={() => onDelete(doc.id)}
 								className="shrink-0 rounded p-0.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
 							>
 								<Trash2 className="size-3" />
@@ -249,12 +475,21 @@ export function SettingsView() {
 		projects,
 		selectedProjectId,
 		updateSources,
+		updateKeywords,
+		updateSelectedModels,
 		updateCompetitors,
 		updateEmailSettings,
+		uploads,
+		uploadsLoading,
+		fetchUploads,
+		uploadDocument,
+		deleteUpload,
 	} = useRadarStore()
 	const project = projects.find(p => p.id === selectedProjectId)
 
 	const [sources, setSources] = useState([])
+	const [keywords, setKeywords] = useState([])
+	const [selectedModels, setSelectedModels] = useState(["DEFAULT"])
 	const [competitors, setCompetitors] = useState([])
 	const [competitorDomains, setCompetitorDomains] = useState([])
 	const [emailEnabled, setEmailEnabled] = useState(false)
@@ -265,12 +500,25 @@ export function SettingsView() {
 	useEffect(() => {
 		if (project) {
 			setSources(project.customSources || [])
+			setKeywords(
+				project.keywords?.length
+					? project.keywords
+					: project.keyword
+						? [project.keyword]
+						: []
+			)
+			setSelectedModels(
+				project.selectedModels?.length
+					? project.selectedModels
+					: ["DEFAULT"]
+			)
 			setCompetitors(project.competitors || [])
 			setCompetitorDomains(project.competitorDomains || [])
 			setEmailEnabled(project.emailEnabled || false)
 			setEmailRecipients(project.emailRecipients || [])
+			fetchUploads()
 		}
-	}, [project])
+	}, [project, fetchUploads])
 
 	if (!project) {
 		return (
@@ -284,6 +532,24 @@ export function SettingsView() {
 		setSaving("sources")
 		try {
 			await updateSources(sources)
+		} finally {
+			setSaving("")
+		}
+	}
+
+	const saveKeywords = async () => {
+		setSaving("keywords")
+		try {
+			await updateKeywords(keywords)
+		} finally {
+			setSaving("")
+		}
+	}
+
+	const saveModels = async () => {
+		setSaving("models")
+		try {
+			await updateSelectedModels(selectedModels)
 		} finally {
 			setSaving("")
 		}
@@ -321,6 +587,56 @@ export function SettingsView() {
 				Project Settings
 			</h2>
 
+			{/* Keywords */}
+			<section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+				<SectionHeader
+					icon={Tag}
+					label="Keywords"
+					description="Topics used to generate search queries for this project."
+				/>
+				<KeywordEditor
+					keywords={keywords}
+					onChange={setKeywords}
+				/>
+				<div className="mt-4 flex justify-end">
+					<Button
+						size="sm"
+						onClick={saveKeywords}
+						disabled={
+							saving === "keywords" || keywords.length === 0
+						}
+						className="gap-1.5"
+					>
+						<Save className="size-3" />
+						{saving === "keywords" ? "Saving…" : "Save Keywords"}
+					</Button>
+				</div>
+			</section>
+
+			{/* Models */}
+			<section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+				<SectionHeader
+					icon={Brain}
+					label="Intelligence Models"
+					description="Choose which models generate individual reports for this project. Default always runs."
+				/>
+				<ModelSelector
+					selectedModels={selectedModels}
+					onChange={setSelectedModels}
+				/>
+				<div className="mt-4 flex justify-end">
+					<Button
+						size="sm"
+						onClick={saveModels}
+						disabled={saving === "models"}
+						className="gap-1.5"
+					>
+						<Save className="size-3" />
+						{saving === "models" ? "Saving…" : "Save Models"}
+					</Button>
+				</div>
+			</section>
+
 			{/* Custom Sources */}
 			<section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
 				<SectionHeader
@@ -344,6 +660,21 @@ export function SettingsView() {
 						{saving === "sources" ? "Saving…" : "Save Sources"}
 					</Button>
 				</div>
+			</section>
+
+			{/* Uploaded Documents */}
+			<section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+				<SectionHeader
+					icon={FileUp}
+					label="Uploaded Documents"
+					description="Upload PDF or text files. Their content will be analyzed as a source during every scan."
+				/>
+				<DocumentUploader
+					uploads={uploads}
+					uploadsLoading={uploadsLoading}
+					onUpload={uploadDocument}
+					onDelete={deleteUpload}
+				/>
 			</section>
 
 			{/* Competitors */}

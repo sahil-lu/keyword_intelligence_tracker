@@ -5,7 +5,7 @@ import { Badge } from "@/ui/badge"
 import { Skeleton } from "@/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { CheckCircle, Clock, History, XCircle } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 function formatDate(ts) {
 	if (!ts) return "—"
@@ -36,6 +36,41 @@ function StatusIcon({ status }) {
 		return <CheckCircle className="size-4 text-emerald-500" />
 	if (status === "failed") return <XCircle className="size-4 text-red-500" />
 	return <Clock className="size-4 animate-pulse text-amber-500" />
+}
+
+function tsToMs(ts) {
+	if (!ts) return 0
+	const sec = ts._seconds ?? ts.seconds
+	if (sec) return sec * 1000
+	const d = new Date(ts)
+	return Number.isNaN(d.getTime()) ? 0 : d.getTime()
+}
+
+function ElapsedTimer({ startedAt }) {
+	const [elapsed, setElapsed] = useState("")
+
+	useEffect(() => {
+		const startMs = tsToMs(startedAt)
+		if (!startMs) return
+
+		const tick = () => {
+			const diff = Math.max(0, Date.now() - startMs)
+			const totalSec = Math.floor(diff / 1000)
+			const h = Math.floor(totalSec / 3600)
+			const m = Math.floor((totalSec % 3600) / 60)
+			const s = totalSec % 60
+
+			if (h > 0) setElapsed(`${h}h ${m}m ${s}s`)
+			else if (m > 0) setElapsed(`${m}m ${s}s`)
+			else setElapsed(`${s}s`)
+		}
+
+		tick()
+		const id = setInterval(tick, 1000)
+		return () => clearInterval(id)
+	}, [startedAt])
+
+	return <span>{elapsed}</span>
 }
 
 function RunsSkeleton() {
@@ -88,7 +123,12 @@ export function RunsView() {
 					{runs.map(run => (
 						<div
 							key={run.id}
-							className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+							className={cn(
+								"flex items-center gap-4 rounded-xl border p-4 shadow-sm",
+								run.status === "running"
+									? "border-amber-200 bg-amber-50/50 dark:border-amber-500/20 dark:bg-amber-500/5"
+									: "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+							)}
 						>
 							<StatusIcon status={run.status} />
 							<div className="min-w-0 flex-1">
@@ -113,36 +153,50 @@ export function RunsView() {
 							</div>
 
 							<div className="flex shrink-0 items-center gap-3 text-xs text-zinc-500">
-								{run.totalItems != null && (
+								{run.status === "running" && run.startedAt && (
 									<div className="text-center">
-										<p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-											{run.totalItems}
+										<p className="text-sm font-semibold text-amber-600 tabular-nums dark:text-amber-400">
+											<ElapsedTimer
+												startedAt={run.startedAt}
+											/>
 										</p>
-										<p>items</p>
+										<p>elapsed</p>
 									</div>
 								)}
-								{run.highPriorityCount != null && (
-									<div className="text-center">
-										<p className="text-sm font-semibold text-red-600 dark:text-red-400">
-											{run.highPriorityCount}
-										</p>
-										<p>high</p>
-									</div>
+								{run.status !== "running" && (
+									<>
+										{run.totalItems != null && (
+											<div className="text-center">
+												<p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+													{run.totalItems}
+												</p>
+												<p>items</p>
+											</div>
+										)}
+										{run.highPriorityCount != null && (
+											<div className="text-center">
+												<p className="text-sm font-semibold text-red-600 dark:text-red-400">
+													{run.highPriorityCount}
+												</p>
+												<p>high</p>
+											</div>
+										)}
+										{run.newItems != null && (
+											<div className="text-center">
+												<p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+													{run.newItems}
+												</p>
+												<p>new</p>
+											</div>
+										)}
+										<div className="text-center">
+											<p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+												{formatDuration(run.duration)}
+											</p>
+											<p>time</p>
+										</div>
+									</>
 								)}
-								{run.newItems != null && (
-									<div className="text-center">
-										<p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-											{run.newItems}
-										</p>
-										<p>new</p>
-									</div>
-								)}
-								<div className="text-center">
-									<p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-										{formatDuration(run.duration)}
-									</p>
-									<p>time</p>
-								</div>
 							</div>
 						</div>
 					))}

@@ -54,6 +54,7 @@ router.get("/:id/report", async (req, res) => {
 			runId: data.runId || null,
 			createdAt: data.createdAt,
 			report: data.report,
+			modelReports: data.modelReports || null,
 			signals,
 		})
 	} catch (err) {

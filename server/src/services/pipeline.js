@@ -13,6 +13,7 @@ import {
 	deduplicateSignals,
 } from "../modules/signalValidator.js"
 import { generateReport } from "../modules/reportGenerator.js"
+import { mergeModelReports, runModels } from "../modules/modelRunner.js"
 
 const CONCURRENCY = 3
 
@@ -21,6 +22,20 @@ function contentHash(text) {
 		.update(text || "")
 		.digest("hex")
 		.slice(0, 16)
+}
+
+function articleBrief(text, title) {
+	const cleaned = String(text || "")
+		.replace(/\s+/g, " ")
+		.trim()
+	if (!cleaned) return title || ""
+
+	const sentences = cleaned
+		.split(/(?<=[.!?])\s+/)
+		.map(s => s.trim())
+		.filter(Boolean)
+	const brief = sentences.slice(0, 2).join(" ")
+	return brief.length > 420 ? `${brief.slice(0, 417).trim()}...` : brief
 }
 
 function urlToDocId(url) {
@@ -46,7 +61,7 @@ async function getPreviousTrend(projectRef) {
 	}
 }
 
-export async function runProject(project) {
+export async function runProject(project, preCreatedRunId) {
 	if (!project?.id) throw new Error("runProject requires project.id")
 
 	const db = getFirestore()
@@ -64,15 +79,23 @@ export async function runProject(project) {
 		firecrawlFail: 0,
 	}
 
-	const runRef = await projectRef.collection("runs").add({
-		status: "running",
-		startedAt: FieldValue.serverTimestamp(),
-		createdAt: FieldValue.serverTimestamp(),
-	})
+	const runRef = preCreatedRunId
+		? projectRef.collection("runs").doc(preCreatedRunId)
+		: await projectRef.collection("runs").add({
+				status: "running",
+				startedAt: FieldValue.serverTimestamp(),
+				createdAt: FieldValue.serverTimestamp(),
+			})
+
+	const projectKeywords =
+		Array.isArray(project.keywords) && project.keywords.length > 0
+			? project.keywords
+			: [project.keyword].filter(Boolean)
+	const keywordContext = projectKeywords.join(", ")
 
 	log("pipeline:start", {
 		projectId: project.id,
-		keyword: project.keyword,
+		keyword: keywordContext,
 		runId: runRef.id,
 	})
 
@@ -135,6 +158,7 @@ export async function runProject(project) {
 					text,
 					hash: contentHash(text),
 					source_type: item.source_type || "search",
+					source_provider: item.source_provider || "unknown",
 					entity: item.entity || null,
 				}
 			} catch (err) {
@@ -149,10 +173,35 @@ export async function runProject(project) {
 					text: "",
 					hash: "",
 					source_type: item.source_type || "search",
+					source_provider: item.source_provider || "unknown",
 					entity: item.entity || null,
 				}
 			}
 		})
+
+		const uploadsSnap = await projectRef
+			.collection("uploads")
+			.orderBy("uploadedAt", "desc")
+			.limit(50)
+			.get()
+		if (!uploadsSnap.empty) {
+			for (const doc of uploadsSnap.docs) {
+				const u = doc.data()
+				if (!u.extractedText || u.extractedText.length < 50) continue
+				extracted.push({
+					url: u.downloadUrl || `upload://${doc.id}/${u.filename}`,
+					title: u.filename,
+					text: u.extractedText,
+					hash: contentHash(u.extractedText),
+					source_type: "upload",
+					source_provider: "pdf_upload",
+					entity: null,
+				})
+			}
+			log("pipeline:uploads", {
+				count: uploadsSnap.docs.length,
+			})
+		}
 
 		const validExtracted = extracted.filter(e => e.text.length > 50)
 
@@ -173,7 +222,7 @@ export async function runProject(project) {
 			let analysis
 			try {
 				analysis = await analyzeContent(row.text, {
-					keyword: project.keyword,
+					keyword: keywordContext,
 					competitors: competitors,
 				})
 			} catch (err) {
@@ -216,6 +265,7 @@ export async function runProject(project) {
 				priority_score,
 				confidence_score: analysis.confidence_score,
 				source_type: row.source_type || "search",
+				source_provider: row.source_provider || "unknown",
 				entity,
 				contentHash: row.hash,
 				runId: runRef.id,
@@ -257,14 +307,18 @@ export async function runProject(project) {
 					lastSeenAt: FieldValue.serverTimestamp(),
 					contentHash: row.hash,
 					title: row.title,
+					article_brief: articleBrief(row.text, row.title),
 					source_type: row.source_type || "search",
+					source_provider: row.source_provider || "unknown",
 					seenInRuns: FieldValue.arrayUnion(runRef.id),
 				})
 			} else {
 				docBatch.set(docRef, {
 					url: row.url,
 					title: row.title,
+					article_brief: articleBrief(row.text, row.title),
 					source_type: row.source_type || "search",
+					source_provider: row.source_provider || "unknown",
 					firstSeenAt: FieldValue.serverTimestamp(),
 					lastSeenAt: FieldValue.serverTimestamp(),
 					contentHash: row.hash,
@@ -276,8 +330,28 @@ export async function runProject(project) {
 
 		const previousTrend = await getPreviousTrend(projectRef)
 
-		const report = generateReport(
+		const defaultReport = generateReport(
 			signals,
+			project,
+			discardedCount,
+			previousTrend
+		)
+		const modelReports = await runModels(project, {
+			signals,
+			defaultReport,
+			discardedCount,
+			previousTrend,
+		})
+		for (const [modelName, modelReport] of Object.entries(modelReports)) {
+			if (modelReport.status && modelReport.status !== "completed") {
+				log("pipeline:model:error", {
+					model: modelName,
+					error: modelReport.error,
+				})
+			}
+		}
+		const report = mergeModelReports(
+			modelReports,
 			project,
 			discardedCount,
 			previousTrend
@@ -287,6 +361,7 @@ export async function runProject(project) {
 			runId: runRef.id,
 			createdAt: FieldValue.serverTimestamp(),
 			report,
+			modelReports,
 		})
 
 		const agentDist = {}
@@ -329,6 +404,7 @@ export async function runProject(project) {
 			competitorUrlsCount: pipelineLog.competitorUrlsCount,
 			duration,
 			reportId: reportRef.id,
+			modelReports,
 		})
 
 		await projectRef.update({
@@ -351,6 +427,7 @@ export async function runProject(project) {
 			reportId: reportRef.id,
 			runId: runRef.id,
 			report,
+			modelReports,
 			signals: signals.map(s => ({ ...s, createdAt: now })),
 		}
 	} catch (err) {

@@ -8,14 +8,17 @@
 		"dev": "node --watch src/index.js"
 	},
 	"dependencies": {
+		"@google/generative-ai": "^0.24.1",
 		"axios": "^1.7.9",
 		"cheerio": "^1.0.0",
 		"cors": "^2.8.6",
 		"dotenv": "^16.4.7",
 		"express": "^4.21.2",
 		"firebase-admin": "^13.0.2",
+		"multer": "^2.1.1",
 		"node-cron": "^3.0.3",
 		"nodemailer": "^8.0.7",
-		"openai": "^4.77.0"
+		"openai": "^6.36.0",
+		"pdf-parse": "^2.4.5"
 	}
 }

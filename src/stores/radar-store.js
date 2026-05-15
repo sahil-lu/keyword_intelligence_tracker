@@ -2,6 +2,9 @@ import { radarApi } from "@/lib/radar-api"
 import { toast } from "sonner"
 import { create } from "zustand"
 
+const SIGNAL_AGENT_VIEWS = ["jobs", "skills", "policy", "program", "competitor"]
+const SCAN_POLL_MS = 5000
+
 export const useRadarStore = create((set, get) => ({
 	projects: [],
 	selectedProjectId: null,
@@ -11,6 +14,8 @@ export const useRadarStore = create((set, get) => ({
 
 	report: null,
 	reportLoading: false,
+	modelReports: {},
+	modelReportsLoading: false,
 
 	signals: [],
 	signalsLoading: false,
@@ -27,16 +32,60 @@ export const useRadarStore = create((set, get) => ({
 	trendsLoading: false,
 
 	scanning: false,
+	scanningRunId: null,
+	_scanPollTimer: null,
 
 	setActiveView: view => {
 		set({ activeView: view })
 		const { selectedProjectId } = get()
 		if (!selectedProjectId) return
 		if (view === "report") get().fetchReport()
+		if (view === "model-analysis") get().fetchModelReports()
 		if (view === "signals") get().fetchSignals()
+		if (SIGNAL_AGENT_VIEWS.includes(view)) {
+			const { signalsFilter } = get()
+			get().fetchSignals({ ...signalsFilter, agent: view })
+		}
 		if (view === "runs") get().fetchRuns()
 		if (view === "documents") get().fetchDocuments()
-		if (view === "competitors") get().fetchSignals({ agent: "competitor" })
+	},
+
+	syncFromUrl: (projectId, view) => {
+		const { selectedProjectId, activeView } = get()
+		const targetView = view || "report"
+
+		const projectChanged = projectId && projectId !== selectedProjectId
+		const viewChanged = targetView !== activeView
+
+		if (!projectChanged && !viewChanged) return
+
+		if (projectChanged) {
+			get()._stopScanPolling()
+			set({
+				selectedProjectId: projectId,
+				activeView: targetView,
+				report: null,
+				modelReports: {},
+				signals: [],
+				runs: [],
+				documents: [],
+				trends: [],
+				scanning: false,
+				scanningRunId: null,
+			})
+		} else {
+			set({ activeView: targetView })
+		}
+
+		if (targetView === "report") get().fetchReport()
+		if (targetView === "model-analysis") get().fetchModelReports()
+		if (targetView === "signals") get().fetchSignals()
+		if (SIGNAL_AGENT_VIEWS.includes(targetView))
+			get().fetchSignals({ agent: targetView })
+		if (targetView === "runs") get().fetchRuns()
+		if (targetView === "documents") get().fetchDocuments()
+
+		if (projectChanged) get()._checkForRunningScans()
 	},
 
 	fetchProjects: async () => {
@@ -56,21 +105,28 @@ export const useRadarStore = create((set, get) => ({
 	},
 
 	selectProject: id => {
+		get()._stopScanPolling()
 		set({
 			selectedProjectId: id,
 			report: null,
+			modelReports: {},
 			signals: [],
 			runs: [],
 			documents: [],
 			trends: [],
+			scanning: false,
+			scanningRunId: null,
 		})
 		const { activeView } = get()
 		if (activeView === "report") get().fetchReport()
+		else if (activeView === "model-analysis") get().fetchModelReports()
 		else if (activeView === "signals") get().fetchSignals()
+		else if (SIGNAL_AGENT_VIEWS.includes(activeView))
+			get().fetchSignals({ agent: activeView })
 		else if (activeView === "runs") get().fetchRuns()
 		else if (activeView === "documents") get().fetchDocuments()
-		else if (activeView === "competitors")
-			get().fetchSignals({ agent: "competitor" })
+
+		get()._checkForRunningScans()
 	},
 
 	createProject: async data => {
@@ -82,18 +138,101 @@ export const useRadarStore = create((set, get) => ({
 
 	runScan: async () => {
 		const { selectedProjectId } = get()
-		if (!selectedProjectId) return
+		if (!selectedProjectId || get().scanning) return
 		set({ scanning: true })
 		try {
 			const result = await radarApi.runScan(selectedProjectId)
-			toast.success("Scan completed")
-			set({ scanning: false })
-			await get().fetchReport()
+			set({ scanningRunId: result.runId })
+			get()._startScanPolling()
 			return result
 		} catch (e) {
 			toast.error(e.message)
-			set({ scanning: false })
+			set({ scanning: false, scanningRunId: null })
 			throw e
+		}
+	},
+
+	_startScanPolling: () => {
+		const existing = get()._scanPollTimer
+		if (existing) clearInterval(existing)
+
+		const timer = setInterval(async () => {
+			const { selectedProjectId } = get()
+			if (!selectedProjectId) {
+				get()._stopScanPolling()
+				return
+			}
+			try {
+				const runs = await radarApi.getRuns(selectedProjectId)
+				set({ runs })
+				const hasRunning = runs.some(r => r.status === "running")
+				if (!hasRunning) {
+					get()._stopScanPolling()
+					set({ scanning: false, scanningRunId: null })
+					toast.success("Scan completed")
+					get().fetchReport()
+					get().fetchModelReports()
+					get().fetchProjects()
+				}
+			} catch {
+				/* ignore polling errors */
+			}
+		}, SCAN_POLL_MS)
+
+		set({ _scanPollTimer: timer })
+	},
+
+	_stopScanPolling: () => {
+		const timer = get()._scanPollTimer
+		if (timer) {
+			clearInterval(timer)
+			set({ _scanPollTimer: null })
+		}
+	},
+
+	_checkForRunningScans: async () => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			const runs = await radarApi.getRuns(selectedProjectId)
+			set({ runs })
+			const running = runs.find(r => r.status === "running")
+			if (running && !get().scanning) {
+				set({ scanning: true, scanningRunId: running.id })
+				get()._startScanPolling()
+			}
+		} catch {
+			/* ignore */
+		}
+	},
+
+	fetchModelReports: async () => {
+		const { selectedProjectId, report } = get()
+		if (!selectedProjectId) return
+		set({ modelReportsLoading: true })
+		try {
+			let currentReport = report
+			if (!currentReport?.runId) {
+				currentReport = await radarApi
+					.getReport(selectedProjectId)
+					.catch(() => null)
+			}
+			if (!currentReport?.runId) {
+				set({ modelReports: {}, modelReportsLoading: false })
+				return
+			}
+			const data = await radarApi.getModelReports(
+				selectedProjectId,
+				currentReport.runId
+			)
+			set({
+				report: currentReport,
+				modelReports: data || {},
+				modelReportsLoading: false,
+			})
+		} catch (e) {
+			toast.error(e.message)
+			set({ modelReports: {}, modelReportsLoading: false })
 		}
 	},
 
@@ -134,7 +273,10 @@ export const useRadarStore = create((set, get) => ({
 	},
 
 	navigateToSignals: (filter = {}) => {
-		set({ signalsFilter: filter, activeView: "signals" })
+		const activeView = SIGNAL_AGENT_VIEWS.includes(filter.agent)
+			? filter.agent
+			: "signals"
+		set({ signalsFilter: filter, activeView })
 		get().fetchSignals(filter)
 	},
 
@@ -189,6 +331,44 @@ export const useRadarStore = create((set, get) => ({
 		}
 	},
 
+	updateKeywords: async keywords => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			const cleanKeywords = keywords
+				.map(k => String(k || "").trim())
+				.filter(Boolean)
+			await radarApi.updateProject(selectedProjectId, {
+				keyword: cleanKeywords[0] || "",
+				keywords: cleanKeywords,
+			})
+			await get().fetchProjects()
+			toast.success("Keywords updated")
+		} catch (e) {
+			toast.error(e.message)
+			throw e
+		}
+	},
+
+	updateSelectedModels: async selectedModels => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			const cleanModels = [
+				"DEFAULT",
+				...(Array.isArray(selectedModels) ? selectedModels : []),
+			].filter((model, index, arr) => arr.indexOf(model) === index)
+			await radarApi.updateProject(selectedProjectId, {
+				selectedModels: cleanModels,
+			})
+			await get().fetchProjects()
+			toast.success("Models updated")
+		} catch (e) {
+			toast.error(e.message)
+			throw e
+		}
+	},
+
 	updateCompetitors: async data => {
 		const { selectedProjectId } = get()
 		if (!selectedProjectId) return
@@ -209,6 +389,51 @@ export const useRadarStore = create((set, get) => ({
 			await radarApi.updateEmailSettings(selectedProjectId, data)
 			await get().fetchProjects()
 			toast.success("Email settings updated")
+		} catch (e) {
+			toast.error(e.message)
+			throw e
+		}
+	},
+
+	uploads: [],
+	uploadsLoading: false,
+
+	fetchUploads: async () => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		set({ uploadsLoading: true })
+		try {
+			const data = await radarApi.getUploads(selectedProjectId)
+			set({ uploads: data, uploadsLoading: false })
+		} catch {
+			set({ uploads: [], uploadsLoading: false })
+		}
+	},
+
+	uploadDocument: async file => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			const result = await radarApi.uploadDocument(
+				selectedProjectId,
+				file
+			)
+			toast.success(`Uploaded ${result.filename}`)
+			await get().fetchUploads()
+			return result
+		} catch (e) {
+			toast.error(e.message)
+			throw e
+		}
+	},
+
+	deleteUpload: async uploadId => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			await radarApi.deleteUpload(selectedProjectId, uploadId)
+			toast.success("Document removed")
+			await get().fetchUploads()
 		} catch (e) {
 			toast.error(e.message)
 			throw e

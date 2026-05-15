@@ -51,6 +51,8 @@ export const radarApi = {
 	},
 
 	getRuns: id => request(`/projects/${id}/runs`),
+	getModelReports: (id, runId) =>
+		request(`/projects/${id}/runs/${runId}/model-reports`),
 	getDocuments: id => request(`/projects/${id}/documents`),
 	getTrends: (id, limit = 20) =>
 		request(`/projects/${id}/trends?limit=${limit}`),
@@ -72,4 +74,22 @@ export const radarApi = {
 			method: "PUT",
 			body: JSON.stringify(data),
 		}),
+
+	getUploads: id => request(`/projects/${id}/uploads`),
+
+	uploadDocument: async (id, file) => {
+		const form = new FormData()
+		form.append("file", file)
+		const res = await fetch(`${BASE}/projects/${id}/uploads`, {
+			method: "POST",
+			body: form,
+		})
+		const data = await res.json().catch(() => ({}))
+		if (!res.ok)
+			throw new Error(data.error || `Upload failed (${res.status})`)
+		return data
+	},
+
+	deleteUpload: (id, uploadId) =>
+		request(`/projects/${id}/uploads/${uploadId}`, { method: "DELETE" }),
 }

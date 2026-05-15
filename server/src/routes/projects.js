@@ -3,16 +3,34 @@ import { FieldValue } from "firebase-admin/firestore"
 import { getFirestore } from "../db/firebase.js"
 import { runProject } from "../services/pipeline.js"
 import { sendEmailReport } from "../services/emailService.js"
+import { normalizeSelectedModels } from "../modules/modelRunner.js"
 
 const router = Router()
 const db = () => getFirestore()
 
+function normalizeKeywords(input, fallback = "") {
+	const values = Array.isArray(input) ? input : []
+	const keywords = values.map(s => String(s || "").trim()).filter(Boolean)
+	if (fallback) keywords.unshift(String(fallback).trim())
+	return [...new Set(keywords.filter(Boolean))]
+}
+
 function projectBody(req) {
-	const { name, keyword, competitors, competitorDomains, frequency } =
-		req.body || {}
+	const {
+		name,
+		keyword,
+		keywords,
+		competitors,
+		competitorDomains,
+		frequency,
+		selectedModels,
+	} = req.body || {}
+	const normalizedKeywords = normalizeKeywords(keywords, keyword)
 	return {
 		name: String(name || "").trim(),
-		keyword: String(keyword || "").trim(),
+		keyword: normalizedKeywords[0] || "",
+		keywords: normalizedKeywords,
+		selectedModels: normalizeSelectedModels(selectedModels),
 		competitors: Array.isArray(competitors) ? competitors.map(String) : [],
 		competitorDomains: Array.isArray(competitorDomains)
 			? competitorDomains.map(String)
@@ -87,6 +105,8 @@ router.put("/:id", async (req, res) => {
 		const allowed = [
 			"name",
 			"keyword",
+			"keywords",
+			"selectedModels",
 			"competitors",
 			"competitorDomains",
 			"frequency",
@@ -95,6 +115,19 @@ router.put("/:id", async (req, res) => {
 			if (req.body[key] !== undefined) {
 				updates[key] = req.body[key]
 			}
+		}
+		if (req.body.keyword !== undefined || req.body.keywords !== undefined) {
+			const keywords = normalizeKeywords(
+				req.body.keywords,
+				req.body.keyword
+			)
+			updates.keyword = keywords[0] || ""
+			updates.keywords = keywords
+		}
+		if (req.body.selectedModels !== undefined) {
+			updates.selectedModels = normalizeSelectedModels(
+				req.body.selectedModels
+			)
 		}
 		updates.updatedAt = FieldValue.serverTimestamp()
 
@@ -187,25 +220,52 @@ router.put("/:id/email-settings", async (req, res) => {
 
 router.post("/:id/run", async (req, res) => {
 	try {
-		const snap = await db().collection("projects").doc(req.params.id).get()
+		const projectRef = db().collection("projects").doc(req.params.id)
+		const snap = await projectRef.get()
 		if (!snap.exists) {
 			return res.status(404).json({ error: "Not found" })
 		}
 
-		const project = { id: snap.id, ...snap.data() }
-		const result = await runProject(project)
-
-		if (project.emailEnabled && project.emailRecipients?.length > 0) {
-			sendEmailReport(
-				project,
-				result.report,
-				project.emailRecipients
-			).catch(err => {
-				console.error("Email send failed:", err.message)
+		const alreadyRunning = await projectRef
+			.collection("runs")
+			.where("status", "==", "running")
+			.limit(1)
+			.get()
+		if (!alreadyRunning.empty) {
+			return res.status(409).json({
+				error: "A scan is already running",
+				runId: alreadyRunning.docs[0].id,
 			})
 		}
 
-		return res.json(result)
+		const project = { id: snap.id, ...snap.data() }
+
+		const runRef = await projectRef.collection("runs").add({
+			status: "running",
+			startedAt: FieldValue.serverTimestamp(),
+			createdAt: FieldValue.serverTimestamp(),
+		})
+
+		res.json({ runId: runRef.id, status: "running" })
+
+		runProject(project, runRef.id)
+			.then(result => {
+				if (
+					project.emailEnabled &&
+					project.emailRecipients?.length > 0
+				) {
+					sendEmailReport(
+						project,
+						result.report,
+						project.emailRecipients
+					).catch(err => {
+						console.error("Email send failed:", err.message)
+					})
+				}
+			})
+			.catch(err => {
+				console.error("Background pipeline error:", err.message)
+			})
 	} catch (err) {
 		console.error("POST /projects/:id/run", err)
 		return res.status(500).json({ error: err.message || "Server error" })

@@ -2,6 +2,13 @@
 
 import { useRadarStore } from "@/stores/radar-store"
 import { Badge } from "@/ui/badge"
+import {
+	ChartContainer,
+	ChartLegend,
+	ChartLegendContent,
+	ChartTooltip,
+	ChartTooltipContent,
+} from "@/ui/chart"
 import { Separator } from "@/ui/separator"
 import { Skeleton } from "@/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -28,12 +35,9 @@ import {
 	Bar,
 	XAxis,
 	YAxis,
-	Tooltip,
-	ResponsiveContainer,
 	LineChart,
 	Line,
 	CartesianGrid,
-	Legend,
 } from "recharts"
 
 const AGENT_CONFIG = {
@@ -95,6 +99,42 @@ const AGENT_CONFIG = {
 
 const PRIORITY_COLORS = { HIGH: "#ef4444", MEDIUM: "#f59e0b", LOW: "#a1a1aa" }
 
+const priorityChartConfig = {
+	high: {
+		label: "High",
+		color: PRIORITY_COLORS.HIGH,
+	},
+	medium: {
+		label: "Medium",
+		color: PRIORITY_COLORS.MEDIUM,
+	},
+	low: {
+		label: "Low",
+		color: PRIORITY_COLORS.LOW,
+	},
+}
+
+const agentChartConfig = {
+	value: {
+		label: "Signals",
+	},
+}
+
+const trendChartConfig = {
+	total: {
+		label: "Total",
+		color: "#71717a",
+	},
+	high: {
+		label: "High",
+		color: PRIORITY_COLORS.HIGH,
+	},
+	medium: {
+		label: "Medium",
+		color: PRIORITY_COLORS.MEDIUM,
+	},
+}
+
 function priorityColor(p) {
 	if (p === "HIGH")
 		return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
@@ -124,18 +164,23 @@ function StatChip({ icon: Icon, label, value, accent, onClick, sub }) {
 			type={onClick ? "button" : undefined}
 			onClick={onClick}
 			className={cn(
-				"flex items-center gap-2 rounded-lg border px-3 py-2 transition-shadow",
-				onClick && "cursor-pointer hover:shadow-md",
+				"group flex h-full w-full items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm shadow-zinc-950/3 transition-all",
+				onClick &&
+					"cursor-pointer hover:-translate-y-0.5 hover:shadow-lg hover:shadow-zinc-950/6",
 				accent ||
-					"border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+					"border-zinc-200/80 bg-white/90 dark:border-zinc-800/80 dark:bg-zinc-950/70"
 			)}
 		>
-			<Icon className="size-4 shrink-0 text-zinc-400" />
+			<div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 transition-colors group-hover:bg-zinc-950 group-hover:text-white dark:bg-zinc-900 dark:text-zinc-400 dark:group-hover:bg-zinc-100 dark:group-hover:text-zinc-950">
+				<Icon className="size-4" />
+			</div>
 			<div className="text-left">
-				<p className="text-lg leading-none font-semibold text-zinc-900 dark:text-zinc-50">
+				<p className="text-xl leading-none font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
 					{value}
 				</p>
-				<p className="mt-0.5 text-[11px] text-zinc-500">{label}</p>
+				<p className="mt-1 text-[11px] font-medium tracking-[0.12em] text-zinc-400 uppercase">
+					{label}
+				</p>
 				{sub && <p className="text-[10px] text-zinc-400">{sub}</p>}
 			</div>
 		</Comp>
@@ -178,19 +223,6 @@ function EmptyReport() {
 			<p className="mt-1 max-w-xs text-xs text-zinc-500">
 				Run a scan to generate your first intelligence report.
 			</p>
-		</div>
-	)
-}
-
-function CustomTooltip({ active, payload }) {
-	if (!active || !payload?.length) return null
-	const d = payload[0].payload
-	return (
-		<div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-			<p className="font-semibold text-zinc-900 dark:text-zinc-50">
-				{d.name}
-			</p>
-			<p className="text-zinc-500">{d.value} signals</p>
 		</div>
 	)
 }
@@ -274,13 +306,24 @@ function PriorityDonut({ stats, onSliceClick }) {
 	const data = useMemo(
 		() =>
 			[
-				{ name: "High", value: stats.high || 0, priority: "HIGH" },
+				{
+					name: "High",
+					value: stats.high || 0,
+					priority: "HIGH",
+					fill: "var(--color-high)",
+				},
 				{
 					name: "Medium",
 					value: stats.medium || 0,
 					priority: "MEDIUM",
+					fill: "var(--color-medium)",
 				},
-				{ name: "Low", value: stats.low || 0, priority: "LOW" },
+				{
+					name: "Low",
+					value: stats.low || 0,
+					priority: "LOW",
+					fill: "var(--color-low)",
+				},
 			].filter(d => d.value > 0),
 		[stats]
 	)
@@ -299,9 +342,9 @@ function PriorityDonut({ stats, onSliceClick }) {
 				Priority Split
 			</p>
 			<div className="relative">
-				<ResponsiveContainer
-					width={140}
-					height={140}
+				<ChartContainer
+					config={priorityChartConfig}
+					className="mx-auto size-[140px]"
 				>
 					<PieChart>
 						<Pie
@@ -318,16 +361,23 @@ function PriorityDonut({ stats, onSliceClick }) {
 								onSliceClick?.(data[idx]?.priority)
 							}
 						>
-							{data.map((_, i) => (
+							{data.map(d => (
 								<Cell
-									key={i}
-									fill={colors[i]}
+									key={d.priority}
+									fill={d.fill}
 								/>
 							))}
 						</Pie>
-						<Tooltip content={<CustomTooltip />} />
+						<ChartTooltip
+							content={
+								<ChartTooltipContent
+									hideLabel
+									nameKey="name"
+								/>
+							}
+						/>
 					</PieChart>
-				</ResponsiveContainer>
+				</ChartContainer>
 				<div className="absolute inset-0 flex flex-col items-center justify-center">
 					<span className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
 						{total}
@@ -376,9 +426,9 @@ function AgentBarChart({ agentSummary }) {
 			<p className="mb-2 text-xs font-semibold tracking-wider text-zinc-400 uppercase">
 				Signals by Agent
 			</p>
-			<ResponsiveContainer
-				width="100%"
-				height={160}
+			<ChartContainer
+				config={agentChartConfig}
+				className="h-[160px] w-full"
 			>
 				<BarChart
 					data={data}
@@ -398,7 +448,15 @@ function AgentBarChart({ agentSummary }) {
 						axisLine={false}
 						tickLine={false}
 					/>
-					<Tooltip content={<CustomTooltip />} />
+					<ChartTooltip
+						content={
+							<ChartTooltipContent
+								labelFormatter={(_, payload) =>
+									payload?.[0]?.payload?.name
+								}
+							/>
+						}
+					/>
 					<Bar
 						dataKey="value"
 						radius={[0, 4, 4, 0]}
@@ -412,7 +470,7 @@ function AgentBarChart({ agentSummary }) {
 						))}
 					</Bar>
 				</BarChart>
-			</ResponsiveContainer>
+			</ChartContainer>
 		</div>
 	)
 }
@@ -422,10 +480,9 @@ function TrendChart({ trends }) {
 		if (!trends?.length) return []
 		return trends.map((t, i) => ({
 			name: `Run ${i + 1}`,
-			Total: t.total || 0,
-			High: t.high || 0,
-			Medium: t.medium || 0,
-			Low: t.low || 0,
+			total: t.total || 0,
+			high: t.high || 0,
+			medium: t.medium || 0,
 		}))
 	}, [trends])
 
@@ -438,9 +495,9 @@ function TrendChart({ trends }) {
 				label="Signal Trends"
 			/>
 			<div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-				<ResponsiveContainer
-					width="100%"
-					height={200}
+				<ChartContainer
+					config={trendChartConfig}
+					className="h-[200px] w-full"
 				>
 					<LineChart
 						data={data}
@@ -455,37 +512,33 @@ function TrendChart({ trends }) {
 							tick={{ fontSize: 10, fill: "#71717a" }}
 						/>
 						<YAxis tick={{ fontSize: 10, fill: "#71717a" }} />
-						<Tooltip
-							contentStyle={{
-								fontSize: 11,
-								borderRadius: 8,
-								border: "1px solid #e4e4e7",
-							}}
+						<ChartTooltip
+							content={<ChartTooltipContent indicator="line" />}
 						/>
-						<Legend wrapperStyle={{ fontSize: 11 }} />
+						<ChartLegend content={<ChartLegendContent />} />
 						<Line
 							type="monotone"
-							dataKey="Total"
-							stroke="#71717a"
+							dataKey="total"
+							stroke="var(--color-total)"
 							strokeWidth={2}
 							dot={{ r: 3 }}
 						/>
 						<Line
 							type="monotone"
-							dataKey="High"
-							stroke="#ef4444"
+							dataKey="high"
+							stroke="var(--color-high)"
 							strokeWidth={2}
 							dot={{ r: 3 }}
 						/>
 						<Line
 							type="monotone"
-							dataKey="Medium"
-							stroke="#f59e0b"
+							dataKey="medium"
+							stroke="var(--color-medium)"
 							strokeWidth={1.5}
 							dot={{ r: 2 }}
 						/>
 					</LineChart>
-				</ResponsiveContainer>
+				</ChartContainer>
 			</div>
 		</section>
 	)
@@ -658,7 +711,7 @@ function SignalCard({ signal }) {
 	const s = signal
 	const conf = s.confidence_score || 0
 	return (
-		<article className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
+		<article className="group flex flex-col rounded-3xl border border-zinc-200/80 bg-white/90 p-5 shadow-xl shadow-zinc-950/4 backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-zinc-950/8 dark:border-zinc-800/80 dark:bg-zinc-950/70">
 			<div className="flex items-start justify-between gap-2">
 				<div className="flex items-center gap-2">
 					<AgentBadge agent={s.agent} />
@@ -706,7 +759,7 @@ function SignalCard({ signal }) {
 				{s.title || "Untitled"}
 			</h3>
 			<div className="mt-3 space-y-2">
-				<div className="rounded-lg border border-zinc-100 bg-zinc-50/50 p-2.5 dark:border-zinc-800 dark:bg-zinc-800/50">
+				<div className="rounded-2xl border border-zinc-100 bg-zinc-50/70 p-3 dark:border-zinc-800 dark:bg-zinc-900/70">
 					<p className="text-[10px] font-semibold tracking-wider text-zinc-400 uppercase">
 						What Changed
 					</p>
@@ -714,7 +767,7 @@ function SignalCard({ signal }) {
 						{s.what_changed}
 					</p>
 				</div>
-				<div className="rounded-lg border border-amber-100 bg-amber-50/50 p-2.5 dark:border-amber-500/20 dark:bg-amber-500/5">
+				<div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 dark:border-amber-500/20 dark:bg-amber-500/5">
 					<p className="text-[10px] font-semibold tracking-wider text-amber-600 uppercase dark:text-amber-400">
 						Impact on ITM
 					</p>
@@ -722,7 +775,7 @@ function SignalCard({ signal }) {
 						{s.impact_on_itm}
 					</p>
 				</div>
-				<div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-2.5 dark:border-emerald-500/20 dark:bg-emerald-500/5">
+				<div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-500/20 dark:bg-emerald-500/5">
 					<p className="text-[10px] font-semibold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
 						Recommended Action
 					</p>
@@ -738,6 +791,67 @@ function SignalCard({ signal }) {
 				</span>
 			</div>
 		</article>
+	)
+}
+
+function buildReportBrief(report) {
+	const summarySentences = (report.executive_summary || "")
+		.split(/(?<=[.!?])\s+/)
+		.map(item => item.trim())
+		.filter(Boolean)
+	const actionPointers = (report.top_actions || [])
+		.map(action => action.action)
+		.filter(Boolean)
+	const signalPointers = (report.top_findings || [])
+		.map(signal => signal.recommended_action || signal.title)
+		.filter(Boolean)
+	const recommendationPointers = (report.recommendations || [])
+		.map(rec => rec.action || rec)
+		.filter(Boolean)
+
+	const pointers = [
+		...summarySentences.slice(0, 2),
+		...actionPointers,
+		...signalPointers,
+		...recommendationPointers,
+	]
+
+	return [...new Set(pointers)].slice(0, 6)
+}
+
+function ReportSummaryPanel({ report }) {
+	const brief = buildReportBrief(report)
+
+	return (
+		<aside className="xl:sticky xl:top-5 xl:self-start">
+			<div className="max-h-[560px] space-y-5 overflow-y-auto overscroll-contain rounded-3xl border border-zinc-200/80 bg-white/90 p-5 shadow-xl shadow-zinc-950/4 backdrop-blur xl:max-h-[calc(100dvh-170px)] dark:border-zinc-800/80 dark:bg-zinc-950/70">
+				<div>
+					<p className="text-[11px] font-semibold tracking-[0.14em] text-zinc-400 uppercase">
+						Report Brief
+					</p>
+					<h2 className="mt-2 text-lg leading-tight font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+						Key takeaways for this project
+					</h2>
+				</div>
+
+				<ul className="space-y-3">
+					{brief.map((item, i) => (
+						<li
+							key={`${item}-${i}`}
+							className="flex gap-3 rounded-2xl border border-zinc-100 bg-zinc-50/60 p-3 text-sm leading-relaxed text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-200"
+						>
+							<span className="mt-2 size-1.5 shrink-0 rounded-full bg-zinc-400 dark:bg-zinc-500" />
+							<span className="line-clamp-3">{item}</span>
+						</li>
+					))}
+					{brief.length === 0 && (
+						<li className="rounded-2xl border border-zinc-100 bg-zinc-50/60 p-3 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
+							Run a scan to generate a short report brief.
+						</li>
+					)}
+				</ul>
+			</div>
+		</aside>
 	)
 }
 
@@ -775,193 +889,207 @@ export function ReportView() {
 	const stats = r.stats || {}
 
 	return (
-		<div className="mx-auto max-w-5xl space-y-8 p-6 pb-12">
-			{/* Stat chips */}
-			<div className="flex flex-wrap gap-3">
-				<StatChip
-					icon={Globe}
-					label="Total signals"
-					value={stats.total ?? "—"}
-					onClick={() => goToSignals()}
-				/>
-				<StatChip
-					icon={TrendingUp}
-					label="New"
-					value={stats.new ?? "—"}
-					onClick={() => goToSignals({ change_type: "new" })}
-				/>
-				<StatChip
-					icon={AlertTriangle}
-					label="High priority"
-					value={stats.high ?? "—"}
-					accent="border-red-200 bg-red-50/50 dark:border-red-500/20 dark:bg-red-500/5"
-					onClick={() => goToSignals({ priority: "HIGH" })}
-				/>
-				<StatChip
-					icon={Shield}
-					label="Discarded"
-					value={stats.discarded ?? "—"}
-					accent="border-zinc-300 bg-zinc-100/50 dark:border-zinc-600 dark:bg-zinc-800/50"
-				/>
-				<StatChip
-					icon={Target}
-					label="Avg Confidence"
-					value={
-						stats.avg_confidence
-							? `${Math.round(stats.avg_confidence * 100)}%`
-							: "—"
-					}
-				/>
-			</div>
+		<div className="w-full p-7 pb-14">
+			<div className="grid w-full grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+				<div className="min-w-0 space-y-8">
+					<div>
+						<p className="text-xs font-semibold tracking-[0.2em] text-zinc-400 uppercase">
+							Combined Intelligence Report
+						</p>
+					</div>
 
-			{/* Charts */}
-			<section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-				<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-					<PriorityDonut
-						stats={stats}
-						onSliceClick={p => goToSignals({ priority: p })}
-					/>
-					<AgentBarChart agentSummary={r.agent_summary} />
-				</div>
-			</section>
-
-			{/* Top 3 Actions */}
-			<TopActionsPanel actions={r.top_actions} />
-
-			{/* Executive summary */}
-			<section className="space-y-3">
-				<SectionHeader
-					icon={Sparkles}
-					label="What Should ITM Do?"
-				/>
-				<div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-					<p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-						{r.executive_summary}
-					</p>
-				</div>
-			</section>
-
-			{/* Delta insights */}
-			<DeltaInsights delta={r.delta} />
-
-			<Separator />
-
-			{/* Agent grid */}
-			{r.agent_summary?.length > 0 && (
-				<section className="space-y-3">
-					<SectionHeader
-						icon={Target}
-						label="Agent Overview"
-					/>
-					<AgentGrid
-						agentSummary={r.agent_summary}
-						onAgentClick={agent => goToSignals({ agent })}
-					/>
-				</section>
-			)}
-
-			<Separator />
-
-			{/* Trend charts */}
-			<TrendChart trends={trends} />
-
-			{/* High priority signals */}
-			{r.top_findings?.length > 0 && (
-				<>
-					<Separator />
-					<section className="space-y-3">
-						<SectionHeader
-							icon={AlertTriangle}
-							label="High Priority Signals"
+					{/* Stat chips */}
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+						<StatChip
+							icon={Globe}
+							label="Total signals"
+							value={stats.total ?? "—"}
+							onClick={() => goToSignals()}
 						/>
-						<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-							{r.top_findings.map((s, i) => (
-								<SignalCard
-									key={`${s.url}-${i}`}
-									signal={s}
-								/>
-							))}
+						<StatChip
+							icon={TrendingUp}
+							label="New"
+							value={stats.new ?? "—"}
+							onClick={() => goToSignals({ change_type: "new" })}
+						/>
+						<StatChip
+							icon={AlertTriangle}
+							label="High priority"
+							value={stats.high ?? "—"}
+							accent="border-red-200 bg-red-50/50 dark:border-red-500/20 dark:bg-red-500/5"
+							onClick={() => goToSignals({ priority: "HIGH" })}
+						/>
+						<StatChip
+							icon={Shield}
+							label="Discarded"
+							value={stats.discarded ?? "—"}
+							accent="border-zinc-300 bg-zinc-100/50 dark:border-zinc-600 dark:bg-zinc-800/50"
+						/>
+						<StatChip
+							icon={Target}
+							label="Avg Confidence"
+							value={
+								stats.avg_confidence
+									? `${Math.round(stats.avg_confidence * 100)}%`
+									: "—"
+							}
+						/>
+					</div>
+
+					{/* Charts */}
+					<section className="rounded-3xl border border-zinc-200/80 bg-white/90 p-6 shadow-xl shadow-zinc-950/4 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/70">
+						<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+							<PriorityDonut
+								stats={stats}
+								onSliceClick={p => goToSignals({ priority: p })}
+							/>
+							<AgentBarChart agentSummary={r.agent_summary} />
 						</div>
 					</section>
-				</>
-			)}
 
-			{/* Recommendations */}
-			{r.recommendations?.length > 0 && (
-				<>
-					<Separator />
+					{/* Top 3 Actions */}
+					<TopActionsPanel actions={r.top_actions} />
+
+					{/* Executive summary */}
 					<section className="space-y-3">
 						<SectionHeader
-							icon={ListChecks}
-							label="Action Items"
+							icon={Sparkles}
+							label="What Should ITM Do?"
 						/>
-						<ul className="space-y-2">
-							{r.recommendations.map((rec, i) => (
-								<li
-									key={i}
-									className="flex gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/50"
-								>
-									<span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-										<ArrowRight className="size-3.5" />
-									</span>
-									<div className="min-w-0 flex-1">
-										<p className="text-sm text-zinc-700 dark:text-zinc-200">
-											{rec.action || rec}
-										</p>
-										{rec.context && (
-											<p className="mt-0.5 text-[11px] text-zinc-400">
-												{rec.context}
-											</p>
-										)}
-									</div>
-									<div className="flex shrink-0 items-center gap-2 self-start">
-										{rec.confidence_score > 0 && (
-											<div
-												className="flex items-center gap-1"
-												title={`Confidence: ${Math.round(rec.confidence_score * 100)}%`}
-											>
-												<div className="h-1.5 w-8 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+						<div className="rounded-3xl border border-zinc-200/80 bg-white/90 p-6 shadow-xl shadow-zinc-950/4 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/70">
+							<p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+								{r.executive_summary}
+							</p>
+						</div>
+					</section>
+
+					{/* Delta insights */}
+					<DeltaInsights delta={r.delta} />
+
+					<Separator />
+
+					{/* Agent grid */}
+					{r.agent_summary?.length > 0 && (
+						<section className="space-y-3">
+							<SectionHeader
+								icon={Target}
+								label="Agent Overview"
+							/>
+							<AgentGrid
+								agentSummary={r.agent_summary}
+								onAgentClick={agent => goToSignals({ agent })}
+							/>
+						</section>
+					)}
+
+					<Separator />
+
+					{/* Trend charts */}
+					<TrendChart trends={trends} />
+
+					{/* High priority signals */}
+					{r.top_findings?.length > 0 && (
+						<>
+							<Separator />
+							<section className="space-y-3">
+								<SectionHeader
+									icon={AlertTriangle}
+									label="High Priority Signals"
+								/>
+								<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+									{r.top_findings.map((s, i) => (
+										<SignalCard
+											key={`${s.url}-${i}`}
+											signal={s}
+										/>
+									))}
+								</div>
+							</section>
+						</>
+					)}
+
+					{/* Recommendations */}
+					{r.recommendations?.length > 0 && (
+						<>
+							<Separator />
+							<section className="space-y-3">
+								<SectionHeader
+									icon={ListChecks}
+									label="Action Items"
+								/>
+								<ul className="space-y-2">
+									{r.recommendations.map((rec, i) => (
+										<li
+											key={i}
+											className="flex gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/50"
+										>
+											<span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+												<ArrowRight className="size-3.5" />
+											</span>
+											<div className="min-w-0 flex-1">
+												<p className="text-sm text-zinc-700 dark:text-zinc-200">
+													{rec.action || rec}
+												</p>
+												{rec.context && (
+													<p className="mt-0.5 text-[11px] text-zinc-400">
+														{rec.context}
+													</p>
+												)}
+											</div>
+											<div className="flex shrink-0 items-center gap-2 self-start">
+												{rec.confidence_score > 0 && (
 													<div
+														className="flex items-center gap-1"
+														title={`Confidence: ${Math.round(rec.confidence_score * 100)}%`}
+													>
+														<div className="h-1.5 w-8 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+															<div
+																className={cn(
+																	"h-full rounded-full",
+																	confidenceColor(
+																		rec.confidence_score
+																	)
+																)}
+																style={{
+																	width: `${Math.round(rec.confidence_score * 100)}%`,
+																}}
+															/>
+														</div>
+													</div>
+												)}
+												{rec.priority && (
+													<Badge
+														variant="outline"
 														className={cn(
-															"h-full rounded-full",
-															confidenceColor(
-																rec.confidence_score
+															"text-[10px]",
+															priorityColor(
+																rec.priority
 															)
 														)}
-														style={{
-															width: `${Math.round(rec.confidence_score * 100)}%`,
-														}}
-													/>
-												</div>
-											</div>
-										)}
-										{rec.priority && (
-											<Badge
-												variant="outline"
-												className={cn(
-													"text-[10px]",
-													priorityColor(rec.priority)
+													>
+														{rec.priority}
+													</Badge>
 												)}
-											>
-												{rec.priority}
-											</Badge>
-										)}
-									</div>
-								</li>
-							))}
-						</ul>
-					</section>
-				</>
-			)}
+											</div>
+										</li>
+									))}
+								</ul>
+							</section>
+						</>
+					)}
+				</div>
+
+				<ReportSummaryPanel report={r} />
+			</div>
 		</div>
 	)
 }
 
 function SectionHeader({ icon: Icon, label }) {
 	return (
-		<div className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-			<div className="flex size-7 items-center justify-center rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
-				<Icon className="size-3.5 text-zinc-500" />
+		<div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+			<div className="flex size-8 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+				<Icon className="size-4 text-zinc-500" />
 			</div>
 			{label}
 		</div>

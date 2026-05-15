@@ -55,7 +55,11 @@ export async function fetchResults(queries) {
 export async function fetchDirectUrls(urls) {
 	return urls
 		.filter(u => typeof u === "string" && u.trim())
-		.map(u => ({ url: u.trim(), title: u.trim() }))
+		.map(u => ({
+			url: u.trim(),
+			title: u.trim(),
+			source_provider: "direct",
+		}))
 }
 
 function mockFetch(queries) {
@@ -65,10 +69,14 @@ function mockFetch(queries) {
 		out.push({
 			url: `https://example.org/radar/${encodeURIComponent(q)}/overview`,
 			title: `Overview: ${q}`,
+			source_type: "search",
+			source_provider: "mock",
 		})
 		out.push({
 			url: `https://example.org/radar/${encodeURIComponent(q)}/news-${i++}`,
 			title: `Latest on ${q}`,
+			source_type: "search",
+			source_provider: "mock",
 		})
 	}
 	return out
@@ -95,6 +103,7 @@ async function tavilySearch(query, apiKey) {
 		url: r.url,
 		title: r.title || r.url,
 		source_type: "search",
+		source_provider: "tavily",
 	}))
 }
 
@@ -121,5 +130,6 @@ async function exaSearch(query, apiKey) {
 		url: r.url,
 		title: r.title || r.url,
 		source_type: "search",
+		source_provider: "exa",
 	}))
 }

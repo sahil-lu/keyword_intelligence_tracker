@@ -12,17 +12,36 @@ import {
 	SelectValue,
 } from "@/ui/select"
 import { X } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 
+const MODEL_OPTIONS = [
+	{ key: "DEFAULT", label: "Default", locked: true },
+	{ key: "OPENAI_DEEP_RESEARCH", label: "OpenAI Deep Research" },
+	{ key: "GEMINI_DEEP_RESEARCH_MAX", label: "Gemini Deep Research Max" },
+	{ key: "PERPLEXITY", label: "Perplexity" },
+]
+
 export function ProjectFormDialog({ onClose }) {
+	const router = useRouter()
 	const { createProject } = useRadarStore()
 	const [name, setName] = useState("")
 	const [keyword, setKeyword] = useState("")
 	const [competitors, setCompetitors] = useState("")
 	const [competitorDomains, setCompetitorDomains] = useState("")
 	const [frequency, setFrequency] = useState("daily")
+	const [selectedModels, setSelectedModels] = useState(["DEFAULT"])
 	const [busy, setBusy] = useState(false)
+
+	const toggleModel = model => {
+		if (model === "DEFAULT") return
+		setSelectedModels(current =>
+			current.includes(model)
+				? current.filter(item => item !== model)
+				: [...current, model]
+		)
+	}
 
 	const onSubmit = async e => {
 		e.preventDefault()
@@ -45,15 +64,18 @@ export function ProjectFormDialog({ onClose }) {
 						.replace(/\/.*$/, "")
 				)
 				.filter(Boolean)
-			await createProject({
+			const created = await createProject({
 				name: name.trim(),
 				keyword: keyword.trim(),
+				keywords: [keyword.trim()],
+				selectedModels,
 				competitors: comp,
 				competitorDomains: domains,
 				frequency,
 			})
 			toast.success("Project created")
 			onClose()
+			if (created?.id) router.push(`/project/${created.id}/report`)
 		} catch (err) {
 			toast.error(err.message || "Failed to create project")
 		} finally {
@@ -139,6 +161,34 @@ export function ProjectFormDialog({ onClose }) {
 								<SelectItem value="weekly">Weekly</SelectItem>
 							</SelectContent>
 						</Select>
+					</div>
+
+					<div className="space-y-2">
+						<Label>Select Models</Label>
+						<div className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/70">
+							{MODEL_OPTIONS.map(model => (
+								<label
+									key={model.key}
+									className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200"
+								>
+									<input
+										type="checkbox"
+										checked={selectedModels.includes(
+											model.key
+										)}
+										disabled={model.locked}
+										onChange={() => toggleModel(model.key)}
+										className="size-4 rounded border-zinc-300"
+									/>
+									<span>{model.label}</span>
+									{model.locked && (
+										<span className="text-[10px] text-zinc-400">
+											always on
+										</span>
+									)}
+								</label>
+							))}
+						</div>
 					</div>
 
 					<div className="flex justify-end gap-2 pt-2">

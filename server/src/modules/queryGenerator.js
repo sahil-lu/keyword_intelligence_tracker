@@ -1,5 +1,11 @@
 export function generateQueries(project) {
-	const keyword = (project.keyword || "").trim()
+	const keywords = (
+		Array.isArray(project.keywords) && project.keywords.length > 0
+			? project.keywords
+			: [project.keyword]
+	)
+		.map(k => String(k || "").trim())
+		.filter(Boolean)
 	const competitors = Array.isArray(project.competitors)
 		? project.competitors
 		: []
@@ -7,25 +13,31 @@ export function generateQueries(project) {
 		? project.competitorDomains
 		: []
 
-	if (!keyword) return []
+	if (keywords.length === 0) return []
 
-	const queries = [
-		keyword,
-		`${keyword} UGC guidelines`,
-		`${keyword} AICTE policy`,
-		`${keyword} exam changes`,
-		`${keyword} hiring trends`,
-		`${keyword} job demand`,
-		`${keyword} skill trends`,
-		`${keyword} technology shifts`,
-		`${keyword} new courses`,
-		`${keyword} program pricing`,
-	]
+	const queries = []
+
+	for (const keyword of keywords) {
+		queries.push(
+			keyword,
+			`${keyword} UGC guidelines`,
+			`${keyword} AICTE policy`,
+			`${keyword} exam changes`,
+			`${keyword} hiring trends`,
+			`${keyword} job demand`,
+			`${keyword} skill trends`,
+			`${keyword} technology shifts`,
+			`${keyword} new courses`,
+			`${keyword} program pricing`
+		)
+	}
 
 	for (const competitor of competitors) {
 		const c = String(competitor).trim()
 		if (!c) continue
-		queries.push(`${c} ${keyword}`)
+		for (const keyword of keywords) {
+			queries.push(`${c} ${keyword}`)
+		}
 		queries.push(`${c} new launch`)
 		queries.push(`${c} fee structure`)
 	}
@@ -33,7 +45,9 @@ export function generateQueries(project) {
 	for (const domain of competitorDomains) {
 		const d = String(domain).trim()
 		if (!d) continue
-		queries.push(`site:${d} ${keyword}`)
+		for (const keyword of keywords) {
+			queries.push(`site:${d} ${keyword}`)
+		}
 	}
 
 	return [...new Set(queries)]
