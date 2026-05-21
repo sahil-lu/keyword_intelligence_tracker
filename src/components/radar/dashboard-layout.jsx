@@ -11,6 +11,7 @@ import { RunsView } from "./runs-view"
 import { DocumentsView } from "./documents-view"
 import { SettingsView } from "./settings-view"
 import { ModelAnalysisView } from "./model-analysis-view"
+import { ChatPanel } from "./chat-panel"
 import { cn } from "@/lib/utils"
 import {
 	BarChart3,
@@ -118,6 +119,8 @@ export function DashboardLayout({ urlProjectId, urlView }) {
 				user={user}
 				onSignOut={signOut}
 			/>
+
+			{selected && <ChatPanel />}
 
 			<main className="flex min-h-0 flex-1 flex-col overflow-hidden">
 				{/* Project header + navigation bar */}

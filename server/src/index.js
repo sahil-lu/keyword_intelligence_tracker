@@ -8,6 +8,7 @@ import runsRouter from "./routes/runs.js"
 import documentsRouter from "./routes/documents.js"
 import trendsRouter from "./routes/trends.js"
 import uploadsRouter from "./routes/uploads.js"
+import chatRouter from "./routes/chat.js"
 import { startScheduler } from "./services/scheduler.js"
 import { fileURLToPath } from "node:url"
 import path from "node:path"
@@ -38,6 +39,7 @@ app.use("/projects", runsRouter)
 app.use("/projects", documentsRouter)
 app.use("/projects", trendsRouter)
 app.use("/projects", uploadsRouter)
+app.use("/projects", chatRouter)
 app.use("/projects", projectsRouter)
 
 process.on("unhandledRejection", err => {

@@ -439,4 +439,88 @@ export const useRadarStore = create((set, get) => ({
 			throw e
 		}
 	},
+
+	chatOpen: false,
+	chatMessages: [],
+	chatLoading: false,
+	chatSuggestions: [],
+
+	toggleChat: () => set(s => ({ chatOpen: !s.chatOpen })),
+	closeChat: () => set({ chatOpen: false }),
+
+	fetchChatHistory: async () => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			const data = await radarApi.getChatHistory(selectedProjectId)
+			set({ chatMessages: data })
+		} catch {
+			set({ chatMessages: [] })
+		}
+	},
+
+	fetchChatSuggestions: async () => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			const data = await radarApi.getChatSuggestions(selectedProjectId)
+			set({ chatSuggestions: data })
+		} catch {
+			set({ chatSuggestions: [] })
+		}
+	},
+
+	sendChat: async message => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId || !message.trim()) return
+
+		set(s => ({
+			chatMessages: [
+				...s.chatMessages,
+				{ role: "user", content: message, id: `u-${Date.now()}` },
+			],
+			chatLoading: true,
+		}))
+
+		try {
+			const result = await radarApi.sendChatMessage(
+				selectedProjectId,
+				message
+			)
+			set(s => ({
+				chatMessages: [
+					...s.chatMessages,
+					{
+						role: "assistant",
+						content: result.response,
+						id: `a-${Date.now()}`,
+					},
+				],
+				chatLoading: false,
+			}))
+		} catch (e) {
+			set(s => ({
+				chatMessages: [
+					...s.chatMessages,
+					{
+						role: "assistant",
+						content: `Sorry, something went wrong: ${e.message}`,
+						id: `e-${Date.now()}`,
+					},
+				],
+				chatLoading: false,
+			}))
+		}
+	},
+
+	clearChat: async () => {
+		const { selectedProjectId } = get()
+		if (!selectedProjectId) return
+		try {
+			await radarApi.clearChatHistory(selectedProjectId)
+			set({ chatMessages: [] })
+		} catch (e) {
+			toast.error(e.message)
+		}
+	},
 }))

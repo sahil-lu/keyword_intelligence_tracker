@@ -92,4 +92,17 @@ export const radarApi = {
 
 	deleteUpload: (id, uploadId) =>
 		request(`/projects/${id}/uploads/${uploadId}`, { method: "DELETE" }),
+
+	sendChatMessage: (id, message) =>
+		request(`/projects/${id}/chat`, {
+			method: "POST",
+			body: JSON.stringify({ message }),
+		}),
+
+	getChatHistory: id => request(`/projects/${id}/chat/history`),
+
+	clearChatHistory: id =>
+		request(`/projects/${id}/chat/history`, { method: "DELETE" }),
+
+	getChatSuggestions: id => request(`/projects/${id}/chat/suggestions`),
 }
